@@ -3,6 +3,7 @@
 extern uint32_t MESSAGE_KEY_TEMPERATURE;
 extern uint32_t MESSAGE_KEY_TEMP_HIGH;
 extern uint32_t MESSAGE_KEY_TEMP_LOW;
+extern uint32_t MESSAGE_KEY_CITY;
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
@@ -13,6 +14,7 @@ static GFont s_font_14;
 static GFont s_font_24;
 static GFont s_font_28;
 static GFont s_font_56;
+static GFont s_font_68;
 
 #define TOP_BAR_HEIGHT 20
 
@@ -24,6 +26,7 @@ static bool s_weather_loaded;
 static char s_temp_buffer[8];
 static char s_high_buffer[8];
 static char s_low_buffer[8];
+static char s_city_buffer[4];
 
 static void update_status_buffer();
 
@@ -42,7 +45,12 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     snprintf(s_low_buffer, sizeof(s_low_buffer), "%d", (int)low_tuple->value->int32);
   }
 
-  if (temp_tuple || high_tuple || low_tuple) {
+  Tuple *city_tuple = dict_find(iterator, MESSAGE_KEY_CITY);
+  if (city_tuple) {
+    snprintf(s_city_buffer, sizeof(s_city_buffer), "%s", city_tuple->value->cstring);
+  }
+
+  if (temp_tuple || high_tuple || low_tuple || city_tuple) {
     s_weather_loaded = true;
     if (s_complications_layer) {
       layer_mark_dirty(s_complications_layer);
@@ -69,7 +77,9 @@ static void update_time() {
   static char s_time_buffer[8];
   strftime(s_time_buffer, sizeof(s_time_buffer), clock_is_24h_style() ?
                                                     "%H:%M" : "%I:%M", tick_time);
-  text_layer_set_text(s_time_layer, s_time_buffer);
+  char *display = s_time_buffer;
+  if (display[0] == '0') display++;
+  text_layer_set_text(s_time_layer, display);
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
@@ -87,10 +97,11 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 static void update_status_buffer() {
-  HealthMetric metric = HealthMetricStepCount;
-  int steps = (int)health_service_sum_today(metric);
-  snprintf(s_status_buffer, sizeof(s_status_buffer), "%s | %d | %d%%",
-           s_bt_connected ? "O" : "X", steps, s_battery_level);
+  time_t temp = time(NULL);
+  struct tm *t = localtime(&temp);
+  static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+  snprintf(s_status_buffer, sizeof(s_status_buffer), "%s | %s %d | %d%%",
+           s_bt_connected ? "O" : "X", days[t->tm_wday], t->tm_mday, s_battery_level);
   if (s_top_bar_layer) {
     layer_mark_dirty(s_top_bar_layer);
   }
@@ -118,12 +129,12 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
 
   // "PEBBLE" left-aligned
   graphics_context_set_text_color(ctx, GColorWhite);
-  GRect left_rect = GRect(4, 2, bounds.size.w / 4, bounds.size.h);
+  GRect left_rect = GRect(4, 2, bounds.size.w / 3, bounds.size.h);
   graphics_draw_text(ctx, "PEBBLE", s_font_14,
                      left_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 
   // Right-aligned status text
-  GRect right_rect = GRect(bounds.size.w / 4, 2, bounds.size.w * 3 / 4 - 4, bounds.size.h);
+  GRect right_rect = GRect(bounds.size.w / 3, 2, bounds.size.w * 2 / 3 - 4, bounds.size.h);
   graphics_draw_text(ctx, s_status_buffer, s_font_14,
                      right_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
 }
@@ -168,7 +179,7 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
 
   graphics_context_set_text_color(ctx, GColorWhite);
   GRect mid_rect = GRect(cx2 - circle_radius, y_center - 16, circle_radius * 2, 34);
-  graphics_draw_text(ctx, "SF", s_font_28,
+  graphics_draw_text(ctx, s_weather_loaded ? s_city_buffer : "--", s_font_28,
                      mid_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // === Right complication: outlined circle with current temp ===
@@ -191,17 +202,19 @@ static void main_window_load(Window *window) {
   s_font_24 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_24));
   s_font_28 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_28));
   s_font_56 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_56));
+  s_font_68 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_68));
 
   // Top bar
   s_top_bar_layer = layer_create(GRect(0, 0, bounds.size.w, TOP_BAR_HEIGHT));
   layer_set_update_proc(s_top_bar_layer, top_bar_update_proc);
 
   // Time layer - large, centered in the upper portion
-  int time_y = (bounds.size.h - 56) / 2 - 20;
-  s_time_layer = text_layer_create(GRect(0, time_y, bounds.size.w, 64));
+  int comp_top = bounds.size.h - 66 - 4;
+  int time_y = TOP_BAR_HEIGHT + (comp_top - TOP_BAR_HEIGHT - 76) / 2;
+  s_time_layer = text_layer_create(GRect(0, time_y, bounds.size.w, 76));
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_text_color(s_time_layer, GColorBlack);
-  text_layer_set_font(s_time_layer, s_font_56);
+  text_layer_set_font(s_time_layer, s_font_68);
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 
   // Complications layer at the bottom
@@ -222,11 +235,12 @@ static void main_window_unload(Window *window) {
   fonts_unload_custom_font(s_font_24);
   fonts_unload_custom_font(s_font_28);
   fonts_unload_custom_font(s_font_56);
+  fonts_unload_custom_font(s_font_68);
 }
 
 static void init() {
   s_main_window = window_create();
-  window_set_background_color(s_main_window, GColorLightGray);
+  window_set_background_color(s_main_window, GColorWhite);
   window_set_window_handlers(s_main_window, (WindowHandlers) {
     .load = main_window_load,
     .unload = main_window_unload

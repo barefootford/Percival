@@ -25,7 +25,8 @@
     "messageKeys": {
         "TEMPERATURE": 0,
         "TEMP_HIGH": 1,
-        "TEMP_LOW": 2
+        "TEMP_LOW": 2,
+        "CITY": 3
       },
     "resources": {
       "media": [
@@ -67,6 +68,13 @@
         {
           "type": "font",
           "name": "FONT_INTER_SEMIBOLD_56",
+          "file": "fonts/Inter-SemiBold.ttf",
+          "characterRegex": "[0-9: ]",
+          "compatibility": "2.7"
+        },
+        {
+          "type": "font",
+          "name": "FONT_INTER_SEMIBOLD_68",
           "file": "fonts/Inter-SemiBold.ttf",
           "characterRegex": "[0-9: ]",
           "compatibility": "2.7"
