@@ -1,15 +1,17 @@
 #include <pebble.h>
 
+extern uint32_t MESSAGE_KEY_TEMPERATURE;
+extern uint32_t MESSAGE_KEY_TEMP_HIGH;
+extern uint32_t MESSAGE_KEY_TEMP_LOW;
+
 static Window *s_main_window;
 static TextLayer *s_time_layer;
 static Layer *s_complications_layer;
 static Layer *s_top_bar_layer;
 
 static GFont s_font_14;
-static GFont s_font_18;
 static GFont s_font_24;
 static GFont s_font_28;
-static GFont s_font_42;
 static GFont s_font_56;
 
 #define TOP_BAR_HEIGHT 20
@@ -18,7 +20,47 @@ static int s_battery_level;
 static bool s_bt_connected;
 static char s_status_buffer[24];
 
+static bool s_weather_loaded;
+static char s_temp_buffer[8];
+static char s_high_buffer[8];
+static char s_low_buffer[8];
+
 static void update_status_buffer();
+
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
+  Tuple *high_tuple = dict_find(iterator, MESSAGE_KEY_TEMP_HIGH);
+  Tuple *low_tuple = dict_find(iterator, MESSAGE_KEY_TEMP_LOW);
+
+  if (temp_tuple) {
+    snprintf(s_temp_buffer, sizeof(s_temp_buffer), "%d", (int)temp_tuple->value->int32);
+  }
+  if (high_tuple) {
+    snprintf(s_high_buffer, sizeof(s_high_buffer), "%d", (int)high_tuple->value->int32);
+  }
+  if (low_tuple) {
+    snprintf(s_low_buffer, sizeof(s_low_buffer), "%d", (int)low_tuple->value->int32);
+  }
+
+  if (temp_tuple || high_tuple || low_tuple) {
+    s_weather_loaded = true;
+    if (s_complications_layer) {
+      layer_mark_dirty(s_complications_layer);
+    }
+  }
+}
+
+static void inbox_dropped_callback(AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Message dropped!");
+}
+
+static void outbox_failed_callback(DictionaryIterator *iterator, AppMessageResult reason, void *context) {
+  APP_LOG(APP_LOG_LEVEL_ERROR, "Outbox send failed!");
+}
+
+static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
+  APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
+}
 
 static void update_time() {
   time_t temp = time(NULL);
@@ -33,6 +75,15 @@ static void update_time() {
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
   update_status_buffer();
+
+  // Request weather update every 30 minutes
+  if (tick_time->tm_min % 30 == 0) {
+    DictionaryIterator *iter;
+    if (app_message_outbox_begin(&iter) == APP_MSG_OK) {
+      dict_write_uint8(iter, 0, 0);
+      app_message_outbox_send();
+    }
+  }
 }
 
 static void update_status_buffer() {
@@ -68,7 +119,7 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   // "PEBBLE" left-aligned
   graphics_context_set_text_color(ctx, GColorWhite);
   GRect left_rect = GRect(4, 2, bounds.size.w / 4, bounds.size.h);
-  graphics_draw_text(ctx, "Pebble", s_font_14,
+  graphics_draw_text(ctx, "PEBBLE", s_font_14,
                      left_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
 
   // Right-aligned status text
@@ -95,10 +146,9 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_circle(ctx, GPoint(cx1, y_center), circle_radius);
 
   graphics_context_set_text_color(ctx, GColorBlack);
-  // "67" top half
   GRect top_rect = GRect(cx1 - circle_radius, y_center - circle_radius + 2,
                           circle_radius * 2, circle_radius - 2);
-  graphics_draw_text(ctx, "67", s_font_24,
+  graphics_draw_text(ctx, s_weather_loaded ? s_high_buffer : "--", s_font_24,
                      top_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // Divider line
@@ -107,10 +157,9 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_line(ctx, GPoint(cx1 - circle_radius + line_margin, y_center),
                          GPoint(cx1 + circle_radius - line_margin, y_center));
 
-  // "34" bottom half
   GRect bot_rect = GRect(cx1 - circle_radius, y_center + 1,
                           circle_radius * 2, circle_radius - 2);
-  graphics_draw_text(ctx, "34", s_font_24,
+  graphics_draw_text(ctx, s_weather_loaded ? s_low_buffer : "--", s_font_24,
                      bot_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // === Middle complication: filled black circle with "SF" ===
@@ -122,14 +171,14 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_text(ctx, "SF", s_font_28,
                      mid_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
-  // === Right complication: outlined circle with "67" ===
+  // === Right complication: outlined circle with current temp ===
   graphics_context_set_stroke_color(ctx, GColorBlack);
   graphics_context_set_stroke_width(ctx, 2);
   graphics_draw_circle(ctx, GPoint(cx3, y_center), circle_radius);
 
   graphics_context_set_text_color(ctx, GColorBlack);
   GRect right_rect = GRect(cx3 - circle_radius, y_center - 16, circle_radius * 2, 34);
-  graphics_draw_text(ctx, "67", s_font_28,
+  graphics_draw_text(ctx, s_weather_loaded ? s_temp_buffer : "--", s_font_28,
                      right_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
@@ -139,10 +188,8 @@ static void main_window_load(Window *window) {
 
   // Load custom fonts
   s_font_14 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_14));
-  s_font_18 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_18));
   s_font_24 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_24));
   s_font_28 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_28));
-  s_font_42 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_42));
   s_font_56 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_56));
 
   // Top bar
@@ -172,10 +219,8 @@ static void main_window_unload(Window *window) {
   layer_destroy(s_complications_layer);
   layer_destroy(s_top_bar_layer);
   fonts_unload_custom_font(s_font_14);
-  fonts_unload_custom_font(s_font_18);
   fonts_unload_custom_font(s_font_24);
   fonts_unload_custom_font(s_font_28);
-  fonts_unload_custom_font(s_font_42);
   fonts_unload_custom_font(s_font_56);
 }
 
@@ -199,6 +244,12 @@ static void init() {
   });
   s_bt_connected = connection_service_peek_pebble_app_connection();
   update_status_buffer();
+
+  app_message_register_inbox_received(inbox_received_callback);
+  app_message_register_inbox_dropped(inbox_dropped_callback);
+  app_message_register_outbox_failed(outbox_failed_callback);
+  app_message_register_outbox_sent(outbox_sent_callback);
+  app_message_open(128, 128);
 }
 
 static void deinit() {

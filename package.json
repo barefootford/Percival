@@ -22,7 +22,11 @@
     "watchapp": {
       "watchface": true
     },
-    "messageKeys": [],
+    "messageKeys": {
+        "TEMPERATURE": 0,
+        "TEMP_HIGH": 1,
+        "TEMP_LOW": 2
+      },
     "resources": {
       "media": [
         {
