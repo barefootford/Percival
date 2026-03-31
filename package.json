@@ -1,0 +1,73 @@
+{
+  "name": "percival",
+  "author": "MakeAwesomeHappen",
+  "version": "1.0.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "Percival",
+    "uuid": "e18ac84c-91e9-4b27-bf5b-ff5b85e6e85a",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery",
+      "flint",
+      "gabbro"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": [],
+    "resources": {
+      "media": [
+        {
+          "type": "font",
+          "name": "FONT_INTER_SEMIBOLD_14",
+          "file": "fonts/Inter-SemiBold.ttf",
+          "characterRegex": "[ -~]",
+          "compatibility": "2.7"
+        },
+        {
+          "type": "font",
+          "name": "FONT_INTER_SEMIBOLD_18",
+          "file": "fonts/Inter-SemiBold.ttf",
+          "characterRegex": "[ -~]",
+          "compatibility": "2.7"
+        },
+        {
+          "type": "font",
+          "name": "FONT_INTER_SEMIBOLD_24",
+          "file": "fonts/Inter-SemiBold.ttf",
+          "characterRegex": "[ -~]",
+          "compatibility": "2.7"
+        },
+        {
+          "type": "font",
+          "name": "FONT_INTER_SEMIBOLD_28",
+          "file": "fonts/Inter-SemiBold.ttf",
+          "characterRegex": "[ -~]",
+          "compatibility": "2.7"
+        },
+        {
+          "type": "font",
+          "name": "FONT_INTER_SEMIBOLD_42",
+          "file": "fonts/Inter-SemiBold.ttf",
+          "characterRegex": "[ -~]",
+          "compatibility": "2.7"
+        },
+        {
+          "type": "font",
+          "name": "FONT_INTER_SEMIBOLD_56",
+          "file": "fonts/Inter-SemiBold.ttf",
+          "characterRegex": "[0-9: ]",
+          "compatibility": "2.7"
+        }
+      ]
+    }
+  }
+}
