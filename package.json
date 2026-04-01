@@ -45,13 +45,6 @@
         },
         {
           "type": "font",
-          "name": "FONT_INTER_SEMIBOLD_18",
-          "file": "fonts/Inter-SemiBold.ttf",
-          "characterRegex": "[ -~]",
-          "compatibility": "2.7"
-        },
-        {
-          "type": "font",
           "name": "FONT_INTER_SEMIBOLD_24",
           "file": "fonts/Inter-SemiBold.ttf",
           "characterRegex": "[ -~]",
@@ -62,20 +55,6 @@
           "name": "FONT_INTER_SEMIBOLD_28",
           "file": "fonts/Inter-SemiBold.ttf",
           "characterRegex": "[ -~]",
-          "compatibility": "2.7"
-        },
-        {
-          "type": "font",
-          "name": "FONT_INTER_SEMIBOLD_42",
-          "file": "fonts/Inter-SemiBold.ttf",
-          "characterRegex": "[ -~]",
-          "compatibility": "2.7"
-        },
-        {
-          "type": "font",
-          "name": "FONT_INTER_SEMIBOLD_56",
-          "file": "fonts/Inter-SemiBold.ttf",
-          "characterRegex": "[0-9: ]",
           "compatibility": "2.7"
         },
         {

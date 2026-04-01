@@ -14,7 +14,6 @@ static Layer *s_top_bar_layer;
 static GFont s_font_14;
 static GFont s_font_24;
 static GFont s_font_28;
-static GFont s_font_56;
 static GFont s_font_68;
 
 #define TOP_BAR_HEIGHT 20
@@ -236,7 +235,6 @@ static void main_window_load(Window *window) {
   s_font_14 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_14));
   s_font_24 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_24));
   s_font_28 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_28));
-  s_font_56 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_56));
   s_font_68 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_68));
 
   // Top bar
@@ -269,7 +267,6 @@ static void main_window_unload(Window *window) {
   fonts_unload_custom_font(s_font_14);
   fonts_unload_custom_font(s_font_24);
   fonts_unload_custom_font(s_font_28);
-  fonts_unload_custom_font(s_font_56);
   fonts_unload_custom_font(s_font_68);
 }
 
