@@ -5,6 +5,8 @@ extern uint32_t MESSAGE_KEY_TEMP_HIGH;
 extern uint32_t MESSAGE_KEY_TEMP_LOW;
 extern uint32_t MESSAGE_KEY_CITY;
 extern uint32_t MESSAGE_KEY_PrimaryColor;
+extern uint32_t MESSAGE_KEY_SUNRISE;
+extern uint32_t MESSAGE_KEY_SUNSET;
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
@@ -47,6 +49,8 @@ typedef struct {
   char high[8];
   char low[8];
   char city[4];
+  char sunrise[8];
+  char sunset[8];
   bool loaded;
 } WeatherCache;
 
@@ -91,7 +95,16 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     snprintf(s_weather.city, sizeof(s_weather.city), "%s", city_tuple->value->cstring);
   }
 
-  if (temp_tuple || high_tuple || low_tuple || city_tuple) {
+  Tuple *sunrise_tuple = dict_find(iterator, MESSAGE_KEY_SUNRISE);
+  if (sunrise_tuple) {
+    snprintf(s_weather.sunrise, sizeof(s_weather.sunrise), "%s", sunrise_tuple->value->cstring);
+  }
+  Tuple *sunset_tuple = dict_find(iterator, MESSAGE_KEY_SUNSET);
+  if (sunset_tuple) {
+    snprintf(s_weather.sunset, sizeof(s_weather.sunset), "%s", sunset_tuple->value->cstring);
+  }
+
+  if (temp_tuple || high_tuple || low_tuple || city_tuple || sunset_tuple) {
     s_weather.loaded = true;
     prv_save_weather();
     if (s_complications_layer) {
@@ -226,13 +239,13 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   int circle_radius = 30;
   int y_center = bounds.size.h / 2;
 
-  // Three circles evenly distributed across width
+  // Three complications evenly spaced
   int section_w = bounds.size.w / 3;
   int cx1 = section_w / 2;
   int cx2 = section_w + section_w / 2;
   int cx3 = 2 * section_w + section_w / 2;
 
-  // === Left complication: high/low fraction ===
+  // === Left: High/Low stroked circle ===
   graphics_context_set_stroke_color(ctx, s_settings.primary_color);
   graphics_context_set_stroke_width(ctx, 2);
   graphics_draw_circle(ctx, GPoint(cx1, y_center), circle_radius);
@@ -243,7 +256,6 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_text(ctx, s_weather.loaded ? s_weather.high : "--", s_font_18,
                      top_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
-  // Divider line
   int line_margin = 10;
   graphics_context_set_stroke_width(ctx, 1);
   graphics_draw_line(ctx, GPoint(cx1 - circle_radius + line_margin, y_center),
@@ -254,33 +266,70 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_text(ctx, s_weather.loaded ? s_weather.low : "--", s_font_18,
                      bot_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
-  // === Middle complication: city initials ===
-  graphics_context_set_stroke_color(ctx, s_settings.primary_color);
-  graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_circle(ctx, GPoint(cx2, y_center), circle_radius);
+  // === Center: Filled circle, city + current temp ===
+  const char *city = s_weather.loaded ? s_weather.city : "--";
+  const char *temp = s_weather.loaded ? s_weather.temp : "--";
 
-  graphics_context_set_text_color(ctx, s_settings.primary_color);
-  GRect mid_rect = GRect(cx2 - circle_radius, y_center - 16, circle_radius * 2, 34);
-  graphics_draw_text(ctx, s_weather.loaded ? s_weather.city : "--", s_font_28,
-                     mid_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  graphics_context_set_fill_color(ctx, s_settings.primary_color);
+  graphics_fill_circle(ctx, GPoint(cx2, y_center), circle_radius);
 
-  // === Right complication: outlined circle with current temp ===
+  graphics_context_set_text_color(ctx, GColorWhite);
+  GRect city_rect = GRect(cx2 - circle_radius, y_center - circle_radius + 7,
+                            circle_radius * 2, 18);
+  graphics_draw_text(ctx, city, s_font_14, city_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  GRect temp_rect = GRect(cx2 - circle_radius, y_center - 8,
+                            circle_radius * 2, 34);
+  graphics_draw_text(ctx, temp, s_font_28, temp_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  if (s_weather.loaded) {
+    GSize ts = graphics_text_layout_get_content_size(
+        temp, s_font_28, temp_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
+    graphics_context_set_stroke_color(ctx, GColorWhite);
+    graphics_context_set_stroke_width(ctx, 1);
+    graphics_draw_circle(ctx, GPoint(cx2 + ts.w / 2 + 3, temp_rect.origin.y + 7), 2);
+  }
+
+  // === Right: Sunset stroked circle with glyph ===
+  const char *set = (s_weather.loaded && s_weather.sunset[0]) ? s_weather.sunset : "--";
+
   graphics_context_set_stroke_color(ctx, s_settings.primary_color);
   graphics_context_set_stroke_width(ctx, 2);
   graphics_draw_circle(ctx, GPoint(cx3, y_center), circle_radius);
 
-  graphics_context_set_text_color(ctx, s_settings.primary_color);
-  GRect right_rect = GRect(cx3 - circle_radius, y_center - 16, circle_radius * 2, 34);
-  graphics_draw_text(ctx, s_weather.loaded ? s_weather.temp : "--", s_font_28,
-                     right_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  // Sunset glyph: semicircle + horizon + rays
+  int sun_r = 12;
+  int horizon_y = y_center - 2;
 
-  if (s_weather.loaded) {
-    GSize temp_size = graphics_text_layout_get_content_size(
-        s_weather.temp, s_font_28, right_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
-    int dot_x = cx3 + temp_size.w / 2 + 3;
-    graphics_context_set_stroke_width(ctx, 1);
-    graphics_draw_circle(ctx, GPoint(dot_x, right_rect.origin.y + 7), 2);
-  }
+  // Draw full sun, then mask bottom half
+  graphics_context_set_fill_color(ctx, s_settings.primary_color);
+  graphics_fill_circle(ctx, GPoint(cx3, horizon_y), sun_r);
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_rect(ctx, GRect(cx3 - sun_r - 1, horizon_y, sun_r * 2 + 2, sun_r + 2), 0, GCornerNone);
+
+  // Horizon line
+  graphics_context_set_stroke_color(ctx, s_settings.primary_color);
+  graphics_context_set_stroke_width(ctx, 1);
+  int hz_w = sun_r + 8;
+  graphics_draw_line(ctx, GPoint(cx3 - hz_w, horizon_y), GPoint(cx3 + hz_w, horizon_y));
+
+  // Rays (up, 45° left, 45° right)
+  int ray_start = sun_r + 3;
+  int ray_end = sun_r + 7;
+  graphics_draw_line(ctx, GPoint(cx3, horizon_y - ray_start),
+                         GPoint(cx3, horizon_y - ray_end));
+  int ds = ray_start * 7 / 10;
+  int de = ray_end * 7 / 10;
+  graphics_draw_line(ctx, GPoint(cx3 - ds, horizon_y - ds),
+                         GPoint(cx3 - de, horizon_y - de));
+  graphics_draw_line(ctx, GPoint(cx3 + ds, horizon_y - ds),
+                         GPoint(cx3 + de, horizon_y - de));
+
+  // Sunset time in lower half
+  graphics_context_set_text_color(ctx, s_settings.primary_color);
+  GRect set_rect = GRect(cx3 - circle_radius, y_center, circle_radius * 2, 24);
+  graphics_draw_text(ctx, set, s_font_18, set_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
 static void main_window_load(Window *window) {

@@ -32,7 +32,9 @@
       "TEMP_HIGH": 1,
       "TEMP_LOW": 2,
       "CITY": 3,
-      "PrimaryColor": 4
+      "PrimaryColor": 4,
+      "SUNRISE": 5,
+      "SUNSET": 6
     },
     "resources": {
       "media": [
@@ -54,7 +56,7 @@
           "type": "font",
           "name": "FONT_INTER_SEMIBOLD_18",
           "file": "fonts/Inter-SemiBold.ttf",
-          "characterRegex": "[0-9\\-]",
+          "characterRegex": "[0-9:\\-]",
           "compatibility": "2.7"
         },
 {
