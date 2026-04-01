@@ -4,6 +4,7 @@ extern uint32_t MESSAGE_KEY_TEMPERATURE;
 extern uint32_t MESSAGE_KEY_TEMP_HIGH;
 extern uint32_t MESSAGE_KEY_TEMP_LOW;
 extern uint32_t MESSAGE_KEY_CITY;
+extern uint32_t MESSAGE_KEY_PrimaryColor;
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
@@ -17,9 +18,28 @@ static GFont s_font_56;
 static GFont s_font_68;
 
 #define TOP_BAR_HEIGHT 20
+#define SETTINGS_KEY 1
+
+typedef struct {
+  GColor primary_color;
+} Settings;
+
+static Settings s_settings;
+
+static void prv_default_settings() {
+  s_settings.primary_color = GColorBlack;
+}
+
+static void prv_load_settings() {
+  prv_default_settings();
+  persist_read_data(SETTINGS_KEY, &s_settings, sizeof(s_settings));
+}
+
+static void prv_save_settings() {
+  persist_write_data(SETTINGS_KEY, &s_settings, sizeof(s_settings));
+}
 
 static int s_battery_level;
-static bool s_bt_connected;
 static char s_status_buffer[24];
 
 static bool s_weather_loaded;
@@ -29,8 +49,10 @@ static char s_low_buffer[8];
 static char s_city_buffer[4];
 
 static void update_status_buffer();
+static void prv_update_display();
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  // Weather data
   Tuple *temp_tuple = dict_find(iterator, MESSAGE_KEY_TEMPERATURE);
   Tuple *high_tuple = dict_find(iterator, MESSAGE_KEY_TEMP_HIGH);
   Tuple *low_tuple = dict_find(iterator, MESSAGE_KEY_TEMP_LOW);
@@ -55,6 +77,14 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     if (s_complications_layer) {
       layer_mark_dirty(s_complications_layer);
     }
+  }
+
+  // Settings
+  Tuple *accent_t = dict_find(iterator, MESSAGE_KEY_PrimaryColor);
+  if (accent_t) {
+    s_settings.primary_color = GColorFromHEX(accent_t->value->int32);
+    prv_save_settings();
+    prv_update_display();
   }
 }
 
@@ -100,8 +130,8 @@ static void update_status_buffer() {
   time_t temp = time(NULL);
   struct tm *t = localtime(&temp);
   static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-  snprintf(s_status_buffer, sizeof(s_status_buffer), "%s | %s %d | %d%%",
-           s_bt_connected ? "O" : "X", days[t->tm_wday], t->tm_mday, s_battery_level);
+  snprintf(s_status_buffer, sizeof(s_status_buffer), "%s %d | %d%%",
+           days[t->tm_wday], t->tm_mday, s_battery_level);
   if (s_top_bar_layer) {
     layer_mark_dirty(s_top_bar_layer);
   }
@@ -112,19 +142,23 @@ static void battery_callback(BatteryChargeState state) {
   update_status_buffer();
 }
 
-static void bluetooth_callback(bool connected) {
-  s_bt_connected = connected;
-  if (!connected) {
-    vibes_double_pulse();
+static void prv_update_display() {
+  if (s_time_layer) {
+    text_layer_set_text_color(s_time_layer, s_settings.primary_color);
   }
-  update_status_buffer();
+  if (s_top_bar_layer) {
+    layer_mark_dirty(s_top_bar_layer);
+  }
+  if (s_complications_layer) {
+    layer_mark_dirty(s_complications_layer);
+  }
 }
 
 static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
 
   // Black background
-  graphics_context_set_fill_color(ctx, GColorBlack);
+  graphics_context_set_fill_color(ctx, s_settings.primary_color);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
   // "PEBBLE" left-aligned
@@ -152,11 +186,11 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   int cx3 = 2 * section_w + section_w / 2;
 
   // === Left complication: 67/34 fraction ===
-  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_stroke_color(ctx, s_settings.primary_color);
   graphics_context_set_stroke_width(ctx, 2);
   graphics_draw_circle(ctx, GPoint(cx1, y_center), circle_radius);
 
-  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_context_set_text_color(ctx, s_settings.primary_color);
   GRect top_rect = GRect(cx1 - circle_radius, y_center - circle_radius + 2,
                           circle_radius * 2, circle_radius - 2);
   graphics_draw_text(ctx, s_weather_loaded ? s_high_buffer : "--", s_font_24,
@@ -173,21 +207,22 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_text(ctx, s_weather_loaded ? s_low_buffer : "--", s_font_24,
                      bot_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
-  // === Middle complication: filled black circle with "SF" ===
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_circle(ctx, GPoint(cx2, y_center), circle_radius);
+  // === Middle complication: city initials ===
+  graphics_context_set_stroke_color(ctx, s_settings.primary_color);
+  graphics_context_set_stroke_width(ctx, 2);
+  graphics_draw_circle(ctx, GPoint(cx2, y_center), circle_radius);
 
-  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_context_set_text_color(ctx, s_settings.primary_color);
   GRect mid_rect = GRect(cx2 - circle_radius, y_center - 16, circle_radius * 2, 34);
   graphics_draw_text(ctx, s_weather_loaded ? s_city_buffer : "--", s_font_28,
                      mid_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // === Right complication: outlined circle with current temp ===
-  graphics_context_set_stroke_color(ctx, GColorBlack);
+  graphics_context_set_stroke_color(ctx, s_settings.primary_color);
   graphics_context_set_stroke_width(ctx, 2);
   graphics_draw_circle(ctx, GPoint(cx3, y_center), circle_radius);
 
-  graphics_context_set_text_color(ctx, GColorBlack);
+  graphics_context_set_text_color(ctx, s_settings.primary_color);
   GRect right_rect = GRect(cx3 - circle_radius, y_center - 16, circle_radius * 2, 34);
   graphics_draw_text(ctx, s_weather_loaded ? s_temp_buffer : "--", s_font_28,
                      right_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
@@ -213,7 +248,7 @@ static void main_window_load(Window *window) {
   int time_y = TOP_BAR_HEIGHT + (comp_top - TOP_BAR_HEIGHT - 76) / 2;
   s_time_layer = text_layer_create(GRect(0, time_y, bounds.size.w, 76));
   text_layer_set_background_color(s_time_layer, GColorClear);
-  text_layer_set_text_color(s_time_layer, GColorBlack);
+  text_layer_set_text_color(s_time_layer, s_settings.primary_color);
   text_layer_set_font(s_time_layer, s_font_68);
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 
@@ -239,6 +274,7 @@ static void main_window_unload(Window *window) {
 }
 
 static void init() {
+  prv_load_settings();
   s_main_window = window_create();
   window_set_background_color(s_main_window, GColorWhite);
   window_set_window_handlers(s_main_window, (WindowHandlers) {
@@ -253,17 +289,13 @@ static void init() {
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
 
-  connection_service_subscribe((ConnectionHandlers) {
-    .pebble_app_connection_handler = bluetooth_callback
-  });
-  s_bt_connected = connection_service_peek_pebble_app_connection();
   update_status_buffer();
 
   app_message_register_inbox_received(inbox_received_callback);
   app_message_register_inbox_dropped(inbox_dropped_callback);
   app_message_register_outbox_failed(outbox_failed_callback);
   app_message_register_outbox_sent(outbox_sent_callback);
-  app_message_open(128, 128);
+  app_message_open(256, 256);
 }
 
 static void deinit() {

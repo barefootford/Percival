@@ -2,9 +2,13 @@
   "name": "percival",
   "author": "MakeAwesomeHappen",
   "version": "1.0.0",
-  "keywords": ["pebble-app"],
+  "keywords": [
+    "pebble-app"
+  ],
   "private": true,
-  "dependencies": {},
+  "dependencies": {
+    "@rebble/clay": "^1.0.8"
+  },
   "pebble": {
     "displayName": "Percival",
     "uuid": "e18ac84c-91e9-4b27-bf5b-ff5b85e6e85a",
@@ -22,12 +26,14 @@
     "watchapp": {
       "watchface": true
     },
+    "capabilities": ["configurable"],
     "messageKeys": {
-        "TEMPERATURE": 0,
-        "TEMP_HIGH": 1,
-        "TEMP_LOW": 2,
-        "CITY": 3
-      },
+      "TEMPERATURE": 0,
+      "TEMP_HIGH": 1,
+      "TEMP_LOW": 2,
+      "CITY": 3,
+      "PrimaryColor": 4
+    },
     "resources": {
       "media": [
         {
