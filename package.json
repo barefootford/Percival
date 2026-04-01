@@ -52,16 +52,16 @@
         },
         {
           "type": "font",
-          "name": "FONT_INTER_SEMIBOLD_24",
+          "name": "FONT_INTER_SEMIBOLD_18",
           "file": "fonts/Inter-SemiBold.ttf",
-          "characterRegex": "[ -~]",
+          "characterRegex": "[0-9\\-]",
           "compatibility": "2.7"
         },
-        {
+{
           "type": "font",
           "name": "FONT_INTER_SEMIBOLD_28",
           "file": "fonts/Inter-SemiBold.ttf",
-          "characterRegex": "[ -~]",
+          "characterRegex": "[ -~°]",
           "compatibility": "2.7"
         },
         {

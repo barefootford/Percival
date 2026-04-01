@@ -8,13 +8,13 @@ extern uint32_t MESSAGE_KEY_PrimaryColor;
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
-static TextLayer *s_brand_layer;
+static Layer *s_brand_layer;
 static Layer *s_complications_layer;
 static Layer *s_top_bar_layer;
 
 static GFont s_font_14;
 static GFont s_font_16;
-static GFont s_font_24;
+static GFont s_font_18;
 static GFont s_font_28;
 static GFont s_font_68;
 
@@ -168,13 +168,43 @@ static void prv_update_display() {
     text_layer_set_text_color(s_time_layer, s_settings.primary_color);
   }
   if (s_brand_layer) {
-    text_layer_set_text_color(s_brand_layer, s_settings.primary_color);
+    layer_mark_dirty(s_brand_layer);
   }
   if (s_top_bar_layer) {
     layer_mark_dirty(s_top_bar_layer);
   }
   if (s_complications_layer) {
     layer_mark_dirty(s_complications_layer);
+  }
+}
+
+static void brand_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  const char *text = "PEBBLE";
+  int len = 6;
+  int tracking = 3;
+
+  // Measure each character and total width
+  int total_width = 0;
+  GSize char_sizes[6];
+  GRect measure_rect = GRect(0, 0, bounds.size.w, bounds.size.h);
+  for (int i = 0; i < len; i++) {
+    char ch[2] = {text[i], '\0'};
+    char_sizes[i] = graphics_text_layout_get_content_size(
+        ch, s_font_16, measure_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft);
+    total_width += char_sizes[i].w;
+  }
+  total_width += tracking * (len - 1);
+
+  // Draw each character centered
+  int x = (bounds.size.w - total_width) / 2;
+  graphics_context_set_text_color(ctx, s_settings.primary_color);
+  for (int i = 0; i < len; i++) {
+    char ch[2] = {text[i], '\0'};
+    GRect char_rect = GRect(x, 0, char_sizes[i].w, bounds.size.h);
+    graphics_draw_text(ctx, ch, s_font_16, char_rect,
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+    x += char_sizes[i].w + tracking;
   }
 }
 
@@ -202,15 +232,15 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   int cx2 = section_w + section_w / 2;
   int cx3 = 2 * section_w + section_w / 2;
 
-  // === Left complication: 67/34 fraction ===
+  // === Left complication: high/low fraction ===
   graphics_context_set_stroke_color(ctx, s_settings.primary_color);
   graphics_context_set_stroke_width(ctx, 2);
   graphics_draw_circle(ctx, GPoint(cx1, y_center), circle_radius);
 
   graphics_context_set_text_color(ctx, s_settings.primary_color);
-  GRect top_rect = GRect(cx1 - circle_radius, y_center - circle_radius + 2,
-                          circle_radius * 2, circle_radius - 2);
-  graphics_draw_text(ctx, s_weather.loaded ? s_weather.high : "--", s_font_24,
+  GRect top_rect = GRect(cx1 - circle_radius, y_center - circle_radius + 6,
+                          circle_radius * 2, circle_radius - 6);
+  graphics_draw_text(ctx, s_weather.loaded ? s_weather.high : "--", s_font_18,
                      top_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // Divider line
@@ -221,7 +251,7 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
 
   GRect bot_rect = GRect(cx1 - circle_radius, y_center + 1,
                           circle_radius * 2, circle_radius - 2);
-  graphics_draw_text(ctx, s_weather.loaded ? s_weather.low : "--", s_font_24,
+  graphics_draw_text(ctx, s_weather.loaded ? s_weather.low : "--", s_font_18,
                      bot_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // === Middle complication: city initials ===
@@ -243,6 +273,14 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   GRect right_rect = GRect(cx3 - circle_radius, y_center - 16, circle_radius * 2, 34);
   graphics_draw_text(ctx, s_weather.loaded ? s_weather.temp : "--", s_font_28,
                      right_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+
+  if (s_weather.loaded) {
+    GSize temp_size = graphics_text_layout_get_content_size(
+        s_weather.temp, s_font_28, right_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
+    int dot_x = cx3 + temp_size.w / 2 + 3;
+    graphics_context_set_stroke_width(ctx, 1);
+    graphics_draw_circle(ctx, GPoint(dot_x, right_rect.origin.y + 7), 2);
+  }
 }
 
 static void main_window_load(Window *window) {
@@ -252,7 +290,7 @@ static void main_window_load(Window *window) {
   // Load custom fonts
   s_font_14 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_14));
   s_font_16 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_16));
-  s_font_24 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_24));
+  s_font_18 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_18));
   s_font_28 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_28));
   s_font_68 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_68));
 
@@ -274,32 +312,28 @@ static void main_window_load(Window *window) {
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 
   // Brand text - centered below time
-  s_brand_layer = text_layer_create(GRect(0, time_y + 76, bounds.size.w, 20));
-  text_layer_set_background_color(s_brand_layer, GColorClear);
-  text_layer_set_text_color(s_brand_layer, s_settings.primary_color);
-  text_layer_set_font(s_brand_layer, s_font_16);
-  text_layer_set_text_alignment(s_brand_layer, GTextAlignmentCenter);
-  text_layer_set_text(s_brand_layer, "PEBBLE");
+  s_brand_layer = layer_create(GRect(0, time_y + 76, bounds.size.w, 20));
+  layer_set_update_proc(s_brand_layer, brand_update_proc);
 
   // Complications layer at the bottom
   int comp_height = 66;
   s_complications_layer = layer_create(GRect(0, bounds.size.h - comp_height - 4, bounds.size.w, comp_height));
   layer_set_update_proc(s_complications_layer, complications_update_proc);
 
-  layer_add_child(window_layer, text_layer_get_layer(s_brand_layer));
+  layer_add_child(window_layer, s_brand_layer);
   layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
   layer_add_child(window_layer, s_complications_layer);
   layer_add_child(window_layer, s_top_bar_layer);
 }
 
 static void main_window_unload(Window *window) {
-  text_layer_destroy(s_brand_layer);
+  layer_destroy(s_brand_layer);
   text_layer_destroy(s_time_layer);
   layer_destroy(s_complications_layer);
   layer_destroy(s_top_bar_layer);
   fonts_unload_custom_font(s_font_14);
   fonts_unload_custom_font(s_font_16);
-  fonts_unload_custom_font(s_font_24);
+  fonts_unload_custom_font(s_font_18);
   fonts_unload_custom_font(s_font_28);
   fonts_unload_custom_font(s_font_68);
 }
