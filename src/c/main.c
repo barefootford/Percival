@@ -19,7 +19,9 @@ static GFont s_font_28;
 static GFont s_font_68;
 
 #define TOP_BAR_HEIGHT 20
+#define WEATHER_POLL_MINUTES 30
 #define SETTINGS_KEY 1
+#define WEATHER_KEY 2
 
 typedef struct {
   GColor primary_color;
@@ -40,14 +42,29 @@ static void prv_save_settings() {
   persist_write_data(SETTINGS_KEY, &s_settings, sizeof(s_settings));
 }
 
+typedef struct {
+  char temp[8];
+  char high[8];
+  char low[8];
+  char city[4];
+  bool loaded;
+} WeatherCache;
+
+static WeatherCache s_weather;
+
+static void prv_load_weather() {
+  memset(&s_weather, 0, sizeof(s_weather));
+  if (persist_exists(WEATHER_KEY)) {
+    persist_read_data(WEATHER_KEY, &s_weather, sizeof(s_weather));
+  }
+}
+
+static void prv_save_weather() {
+  persist_write_data(WEATHER_KEY, &s_weather, sizeof(s_weather));
+}
+
 static int s_battery_level;
 static char s_status_buffer[24];
-
-static bool s_weather_loaded;
-static char s_temp_buffer[8];
-static char s_high_buffer[8];
-static char s_low_buffer[8];
-static char s_city_buffer[4];
 
 static void update_status_buffer();
 static void prv_update_display();
@@ -60,22 +77,23 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   Tuple *low_tuple = dict_find(iterator, MESSAGE_KEY_TEMP_LOW);
 
   if (temp_tuple) {
-    snprintf(s_temp_buffer, sizeof(s_temp_buffer), "%d", (int)temp_tuple->value->int32);
+    snprintf(s_weather.temp, sizeof(s_weather.temp), "%d", (int)temp_tuple->value->int32);
   }
   if (high_tuple) {
-    snprintf(s_high_buffer, sizeof(s_high_buffer), "%d", (int)high_tuple->value->int32);
+    snprintf(s_weather.high, sizeof(s_weather.high), "%d", (int)high_tuple->value->int32);
   }
   if (low_tuple) {
-    snprintf(s_low_buffer, sizeof(s_low_buffer), "%d", (int)low_tuple->value->int32);
+    snprintf(s_weather.low, sizeof(s_weather.low), "%d", (int)low_tuple->value->int32);
   }
 
   Tuple *city_tuple = dict_find(iterator, MESSAGE_KEY_CITY);
   if (city_tuple) {
-    snprintf(s_city_buffer, sizeof(s_city_buffer), "%s", city_tuple->value->cstring);
+    snprintf(s_weather.city, sizeof(s_weather.city), "%s", city_tuple->value->cstring);
   }
 
   if (temp_tuple || high_tuple || low_tuple || city_tuple) {
-    s_weather_loaded = true;
+    s_weather.loaded = true;
+    prv_save_weather();
     if (s_complications_layer) {
       layer_mark_dirty(s_complications_layer);
     }
@@ -118,8 +136,9 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
   update_status_buffer();
 
-  // Request weather update every 30 minutes
-  if (tick_time->tm_min % 30 == 0) {
+  // Request weather update every 30 minutes (only if phone is connected)
+  if (tick_time->tm_min % WEATHER_POLL_MINUTES == 0 &&
+      connection_service_peek_pebble_app_connection()) {
     DictionaryIterator *iter;
     if (app_message_outbox_begin(&iter) == APP_MSG_OK) {
       dict_write_uint8(iter, 0, 0);
@@ -191,7 +210,7 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_text_color(ctx, s_settings.primary_color);
   GRect top_rect = GRect(cx1 - circle_radius, y_center - circle_radius + 2,
                           circle_radius * 2, circle_radius - 2);
-  graphics_draw_text(ctx, s_weather_loaded ? s_high_buffer : "--", s_font_24,
+  graphics_draw_text(ctx, s_weather.loaded ? s_weather.high : "--", s_font_24,
                      top_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // Divider line
@@ -202,7 +221,7 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
 
   GRect bot_rect = GRect(cx1 - circle_radius, y_center + 1,
                           circle_radius * 2, circle_radius - 2);
-  graphics_draw_text(ctx, s_weather_loaded ? s_low_buffer : "--", s_font_24,
+  graphics_draw_text(ctx, s_weather.loaded ? s_weather.low : "--", s_font_24,
                      bot_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // === Middle complication: city initials ===
@@ -212,7 +231,7 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
 
   graphics_context_set_text_color(ctx, s_settings.primary_color);
   GRect mid_rect = GRect(cx2 - circle_radius, y_center - 16, circle_radius * 2, 34);
-  graphics_draw_text(ctx, s_weather_loaded ? s_city_buffer : "--", s_font_28,
+  graphics_draw_text(ctx, s_weather.loaded ? s_weather.city : "--", s_font_28,
                      mid_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   // === Right complication: outlined circle with current temp ===
@@ -222,7 +241,7 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
 
   graphics_context_set_text_color(ctx, s_settings.primary_color);
   GRect right_rect = GRect(cx3 - circle_radius, y_center - 16, circle_radius * 2, 34);
-  graphics_draw_text(ctx, s_weather_loaded ? s_temp_buffer : "--", s_font_28,
+  graphics_draw_text(ctx, s_weather.loaded ? s_weather.temp : "--", s_font_28,
                      right_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
@@ -287,6 +306,7 @@ static void main_window_unload(Window *window) {
 
 static void init() {
   prv_load_settings();
+  prv_load_weather();
   s_main_window = window_create();
   window_set_background_color(s_main_window, GColorWhite);
   window_set_window_handlers(s_main_window, (WindowHandlers) {
@@ -300,8 +320,6 @@ static void init() {
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
-
-  update_status_buffer();
 
   app_message_register_inbox_received(inbox_received_callback);
   app_message_register_inbox_dropped(inbox_dropped_callback);

@@ -1,3 +1,5 @@
+var WEATHER_POLL_MINUTES = 30;
+
 var Clay = require('@rebble/clay');
 var clayConfig = require('./config');
 var clay = new Clay(clayConfig);
@@ -11,12 +13,23 @@ var xhrRequest = function (url, type, callback) {
   xhr.send();
 };
 
+var cachedCity = null;
+var lastLat = null;
+var lastLon = null;
+var LOCATION_THRESHOLD = 0.01; // ~1km movement before re-fetching city
+
 function getCityInitials(name) {
   var words = name.trim().split(/\s+/);
   if (words.length >= 2) {
     return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
   }
   return words[0].charAt(0).toUpperCase();
+}
+
+function locationMoved(lat, lon) {
+  return lastLat === null ||
+    Math.abs(lat - lastLat) > LOCATION_THRESHOLD ||
+    Math.abs(lon - lastLon) > LOCATION_THRESHOLD;
 }
 
 function locationSuccess(pos) {
@@ -30,27 +43,46 @@ function locationSuccess(pos) {
     '&temperature_unit=fahrenheit' +
     '&forecast_days=1';
 
-  var geoUrl = 'https://api.bigdatacloud.net/data/reverse-geocode-client?' +
-    'latitude=' + lat + '&longitude=' + lon + '&localityLanguage=en';
+  var needGeo = locationMoved(lat, lon);
+  var weatherData = null;
+  var cityInitials = cachedCity;
+  var pending = needGeo ? 2 : 1;
+
+  function trySend() {
+    pending--;
+    if (pending > 0) return;
+
+    lastLat = lat;
+    lastLon = lon;
+    cachedCity = cityInitials;
+
+    Pebble.sendAppMessage({
+      'TEMPERATURE': Math.round(weatherData.current.temperature_2m),
+      'TEMP_HIGH': Math.round(weatherData.daily.temperature_2m_max[0]),
+      'TEMP_LOW': Math.round(weatherData.daily.temperature_2m_min[0]),
+      'CITY': cityInitials
+    },
+      function (e) { console.log('Weather sent successfully'); },
+      function (e) { console.log('Error sending weather: ' + JSON.stringify(e)); }
+    );
+  }
 
   xhrRequest(weatherUrl, 'GET', function (weatherResp) {
-    var weather = JSON.parse(weatherResp);
+    weatherData = JSON.parse(weatherResp);
+    trySend();
+  });
+
+  if (needGeo) {
+    var geoUrl = 'https://api.bigdatacloud.net/data/reverse-geocode-client?' +
+      'latitude=' + lat + '&longitude=' + lon + '&localityLanguage=en';
 
     xhrRequest(geoUrl, 'GET', function (geoResp) {
       var geo = JSON.parse(geoResp);
       var city = geo.city || geo.locality || '?';
-
-      Pebble.sendAppMessage({
-        'TEMPERATURE': Math.round(weather.current.temperature_2m),
-        'TEMP_HIGH': Math.round(weather.daily.temperature_2m_max[0]),
-        'TEMP_LOW': Math.round(weather.daily.temperature_2m_min[0]),
-        'CITY': getCityInitials(city)
-      },
-        function (e) { console.log('Weather sent successfully'); },
-        function (e) { console.log('Error sending weather: ' + JSON.stringify(e)); }
-      );
+      cityInitials = getCityInitials(city);
+      trySend();
     });
-  });
+  }
 }
 
 function locationError(err) {
@@ -61,7 +93,7 @@ function getWeather() {
   navigator.geolocation.getCurrentPosition(
     locationSuccess,
     locationError,
-    { timeout: 15000, maximumAge: 60000 }
+    { timeout: 15000, maximumAge: WEATHER_POLL_MINUTES * 60 * 1000 }
   );
 }
 
