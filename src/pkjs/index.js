@@ -26,6 +26,12 @@ function getCityInitials(name) {
   return words[0].charAt(0).toUpperCase();
 }
 
+function formatTo12h(isoString) {
+  var parts = isoString.split('T')[1].split(':');
+  var h = parseInt(parts[0], 10) % 12 || 12;
+  return h + ':' + parts[1];
+}
+
 function locationMoved(lat, lon) {
   return lastLat === null ||
     Math.abs(lat - lastLat) > LOCATION_THRESHOLD ||
@@ -41,6 +47,7 @@ function locationSuccess(pos) {
     '&current=temperature_2m' +
     '&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset' +
     '&temperature_unit=fahrenheit' +
+    '&timezone=auto' +
     '&forecast_days=1';
 
   var needGeo = locationMoved(lat, lon);
@@ -56,21 +63,13 @@ function locationSuccess(pos) {
     lastLon = lon;
     cachedCity = cityInitials;
 
-    var rise = weatherData.daily.sunrise[0].split('T')[1].split(':');
-    var set = weatherData.daily.sunset[0].split('T')[1].split(':');
-    var rh = parseInt(rise[0], 10);
-    var sh = parseInt(set[0], 10);
-    if (rh === 0) rh = 12; else if (rh > 12) rh -= 12;
-    if (sh === 0) sh = 12; else if (sh > 12) sh -= 12;
-    rise = rh + ':' + rise[1];
-    set = sh + ':' + set[1];
+    var set = formatTo12h(weatherData.daily.sunset[0]);
 
     Pebble.sendAppMessage({
       'TEMPERATURE': Math.round(weatherData.current.temperature_2m),
       'TEMP_HIGH': Math.round(weatherData.daily.temperature_2m_max[0]),
       'TEMP_LOW': Math.round(weatherData.daily.temperature_2m_min[0]),
       'CITY': cityInitials,
-      'SUNRISE': rise,
       'SUNSET': set
     },
       function (e) { console.log('Weather sent successfully'); },

@@ -5,7 +5,6 @@ extern uint32_t MESSAGE_KEY_TEMP_HIGH;
 extern uint32_t MESSAGE_KEY_TEMP_LOW;
 extern uint32_t MESSAGE_KEY_CITY;
 extern uint32_t MESSAGE_KEY_PrimaryColor;
-extern uint32_t MESSAGE_KEY_SUNRISE;
 extern uint32_t MESSAGE_KEY_SUNSET;
 
 static Window *s_main_window;
@@ -49,7 +48,6 @@ typedef struct {
   char high[8];
   char low[8];
   char city[4];
-  char sunrise[8];
   char sunset[8];
   bool loaded;
 } WeatherCache;
@@ -95,10 +93,6 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     snprintf(s_weather.city, sizeof(s_weather.city), "%s", city_tuple->value->cstring);
   }
 
-  Tuple *sunrise_tuple = dict_find(iterator, MESSAGE_KEY_SUNRISE);
-  if (sunrise_tuple) {
-    snprintf(s_weather.sunrise, sizeof(s_weather.sunrise), "%s", sunrise_tuple->value->cstring);
-  }
   Tuple *sunset_tuple = dict_find(iterator, MESSAGE_KEY_SUNSET);
   if (sunset_tuple) {
     snprintf(s_weather.sunset, sizeof(s_weather.sunset), "%s", sunset_tuple->value->cstring);
@@ -251,8 +245,8 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_circle(ctx, GPoint(cx1, y_center), circle_radius);
 
   graphics_context_set_text_color(ctx, s_settings.primary_color);
-  GRect top_rect = GRect(cx1 - circle_radius, y_center - circle_radius + 6,
-                          circle_radius * 2, circle_radius - 6);
+  GRect top_rect = GRect(cx1 - circle_radius, y_center - circle_radius + 7,
+                          circle_radius * 2, circle_radius - 7);
   graphics_draw_text(ctx, s_weather.loaded ? s_weather.high : "--", s_font_18,
                      top_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
@@ -261,7 +255,7 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_line(ctx, GPoint(cx1 - circle_radius + line_margin, y_center),
                          GPoint(cx1 + circle_radius - line_margin, y_center));
 
-  GRect bot_rect = GRect(cx1 - circle_radius, y_center + 1,
+  GRect bot_rect = GRect(cx1 - circle_radius, y_center + 2,
                           circle_radius * 2, circle_radius - 2);
   graphics_draw_text(ctx, s_weather.loaded ? s_weather.low : "--", s_font_18,
                      bot_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
