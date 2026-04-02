@@ -1,5 +1,16 @@
 # Percival
 
-A clean, weather-focused watchface for Pebble smartwatches. Percival displays the current time, day, date, and battery level alongside three bottom weather complications showing the current temperature, daily high/low, and city where the weather has been requested from. Weather is fetched every 30 minutes from the Open-Meteo API, and city names are resolved via the BigDataCloud reverse geocoding API. Both are cached on-watch so data persists across app restarts. Primary color is configurable through the settings.
+<p align="center">
+  <img src="screenshots/percival-dark-blue.png" width="160" alt="Dark blue accent — SF">&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/percival-dark-red.png" width="160" alt="Dark red accent — NY">&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/percival-black.png" width="160" alt="Black accent">
+</p>
 
-Percival is built with battery efficiency in mind. Weather and location requests are kept to a minimum — geolocation results are cached to avoid redundant GPS lookups, reverse geocoding is skipped when the user hasn't moved, and weather requests are only sent when the phone is connected via Bluetooth. Tested on Time 2 but should work on other devices too.
+A weather-focused Pebble watchface. Three location aware complications show:
+- Current temperature
+- Daily high/low
+- Sunset time
+
+Weather data is pulled from the Open-Meteo API every 30 minutes. Location is resolved through GPS coordinates via BigDataCloud. Cached when location changes less than 1km.
+
+Color is configurable through settings.
