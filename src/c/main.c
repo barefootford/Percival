@@ -15,6 +15,8 @@ static Layer *s_top_bar_layer;
 static Layer *s_window_layer;
 
 static GBitmap *s_brand_bitmap;
+static GBitmap *s_corner_bl_bitmap;
+static GBitmap *s_corner_br_bitmap;
 
 static GFont s_font_14;
 static GFont s_font_18;
@@ -205,7 +207,24 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
 
   graphics_context_set_fill_color(ctx, s_settings.primary_color);
-  graphics_fill_rect(ctx, bounds, 8, GCornersBottom);
+  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+
+  // Draw corner masks to round the bottom edges of the bar.
+  // The bitmaps are 1-bit: black pixels get drawn in the background color
+  // (erasing the bar corner), white pixels become transparent (keeping the bar).
+  GSize bl_size = gbitmap_get_bounds(s_corner_bl_bitmap).size;
+  GSize br_size = gbitmap_get_bounds(s_corner_br_bitmap).size;
+  #ifdef PBL_COLOR
+    GColor bl_palette[] = {GColorWhite, GColorClear};
+    gbitmap_set_palette(s_corner_bl_bitmap, bl_palette, false);
+    GColor br_palette[] = {GColorWhite, GColorClear};
+    gbitmap_set_palette(s_corner_br_bitmap, br_palette, false);
+  #endif
+  graphics_context_set_compositing_mode(ctx, GCompOpSet);
+  graphics_draw_bitmap_in_rect(ctx, s_corner_bl_bitmap,
+      GRect(0, bounds.size.h - bl_size.h, bl_size.w, bl_size.h));
+  graphics_draw_bitmap_in_rect(ctx, s_corner_br_bitmap,
+      GRect(bounds.size.w - br_size.w, bounds.size.h - br_size.h, br_size.w, br_size.h));
 
   graphics_context_set_text_color(ctx, GColorWhite);
   GRect text_rect = GRect(4, 2, bounds.size.w - 8, bounds.size.h);
@@ -346,6 +365,8 @@ static void main_window_load(Window *window) {
 
   // Load resources
   s_brand_bitmap = gbitmap_create_with_resource(RESOURCE_ID_PEBBLE_LOGO);
+  s_corner_bl_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CORNER_BL);
+  s_corner_br_bitmap = gbitmap_create_with_resource(RESOURCE_ID_CORNER_BR);
   s_font_14 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_14));
   s_font_18 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_18));
   s_font_28 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_28));
@@ -391,6 +412,8 @@ static void main_window_unload(Window *window) {
   layer_destroy(s_complications_layer);
   layer_destroy(s_top_bar_layer);
   gbitmap_destroy(s_brand_bitmap);
+  gbitmap_destroy(s_corner_bl_bitmap);
+  gbitmap_destroy(s_corner_br_bitmap);
   fonts_unload_custom_font(s_font_14);
   fonts_unload_custom_font(s_font_18);
   fonts_unload_custom_font(s_font_28);

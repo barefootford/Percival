@@ -43,6 +43,16 @@
           "file": "images/pebble_logo.png"
         },
         {
+          "type": "png",
+          "name": "CORNER_BL",
+          "file": "images/corner_bl_8.png"
+        },
+        {
+          "type": "png",
+          "name": "CORNER_BR",
+          "file": "images/corner_br_8.png"
+        },
+        {
           "type": "font",
           "name": "FONT_INTER_SEMIBOLD_14",
           "file": "fonts/Inter-SemiBold.ttf",
