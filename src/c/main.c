@@ -205,7 +205,7 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
 
   graphics_context_set_fill_color(ctx, s_settings.primary_color);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  graphics_fill_rect(ctx, bounds, 8, GCornersBottom);
 
   graphics_context_set_text_color(ctx, GColorWhite);
   GRect text_rect = GRect(4, 2, bounds.size.w - 8, bounds.size.h);
