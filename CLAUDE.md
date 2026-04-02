@@ -6,7 +6,7 @@ Pebble watchface built with Pebble SDK 3. Displays time, date, battery, and weat
 
 ```
 pebble build
-pebble install --emulator basalt
+pebble install --emulator emery   # Time 2
 pebble install --phone <IP>
 ```
 
