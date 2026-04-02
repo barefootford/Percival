@@ -12,6 +12,7 @@ static TextLayer *s_time_layer;
 static Layer *s_brand_layer;
 static Layer *s_complications_layer;
 static Layer *s_top_bar_layer;
+static Layer *s_window_layer;
 
 static GFont s_font_14;
 static GFont s_font_16;
@@ -326,9 +327,37 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
+static void prv_update_layout() {
+  GRect full = layer_get_bounds(s_window_layer);
+  GRect unob = layer_get_unobstructed_bounds(s_window_layer);
+  int obstructed = full.size.h - unob.size.h;
+
+  layer_set_hidden(s_complications_layer, obstructed > 0);
+
+  int comp_space = 70;
+  int bottom = unob.size.h < (full.size.h - comp_space)
+             ? unob.size.h
+             : (full.size.h - comp_space);
+  int group_h = 76 + 18;
+  int group_y = TOP_BAR_HEIGHT + (bottom - TOP_BAR_HEIGHT - group_h) / 2;
+
+  layer_set_frame(text_layer_get_layer(s_time_layer),
+                  GRect(0, group_y, full.size.w, 76));
+  layer_set_frame(s_brand_layer,
+                  GRect(0, group_y + 76, full.size.w, 20));
+}
+
+static void prv_unobstructed_change(AnimationProgress progress, void *context) {
+  prv_update_layout();
+}
+
+static void prv_unobstructed_did_change(void *context) {
+  prv_update_layout();
+}
+
 static void main_window_load(Window *window) {
-  Layer *window_layer = window_get_root_layer(window);
-  GRect bounds = layer_get_bounds(window_layer);
+  s_window_layer = window_get_root_layer(window);
+  GRect bounds = layer_get_bounds(s_window_layer);
 
   // Load custom fonts
   s_font_14 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_14));
@@ -341,21 +370,15 @@ static void main_window_load(Window *window) {
   s_top_bar_layer = layer_create(GRect(0, 0, bounds.size.w, TOP_BAR_HEIGHT));
   layer_set_update_proc(s_top_bar_layer, top_bar_update_proc);
 
-  // Time + brand as a vertically centered group
-  int comp_top = bounds.size.h - 66 - 4;
-  int group_height = 76 + 18;  // time + brand
-  int group_y = TOP_BAR_HEIGHT + (comp_top - TOP_BAR_HEIGHT - group_height) / 2;
-
-  // Time layer
-  int time_y = group_y;
-  s_time_layer = text_layer_create(GRect(0, time_y, bounds.size.w, 76));
+  // Time layer (positioned by prv_update_layout)
+  s_time_layer = text_layer_create(GRect(0, 0, bounds.size.w, 76));
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_text_color(s_time_layer, s_settings.primary_color);
   text_layer_set_font(s_time_layer, s_font_68);
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 
-  // Brand text - centered below time
-  s_brand_layer = layer_create(GRect(0, time_y + 76, bounds.size.w, 20));
+  // Brand text (positioned by prv_update_layout)
+  s_brand_layer = layer_create(GRect(0, 0, bounds.size.w, 20));
   layer_set_update_proc(s_brand_layer, brand_update_proc);
 
   // Complications layer at the bottom
@@ -363,13 +386,21 @@ static void main_window_load(Window *window) {
   s_complications_layer = layer_create(GRect(0, bounds.size.h - comp_height - 4, bounds.size.w, comp_height));
   layer_set_update_proc(s_complications_layer, complications_update_proc);
 
-  layer_add_child(window_layer, s_brand_layer);
-  layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
-  layer_add_child(window_layer, s_complications_layer);
-  layer_add_child(window_layer, s_top_bar_layer);
+  layer_add_child(s_window_layer, s_brand_layer);
+  layer_add_child(s_window_layer, text_layer_get_layer(s_time_layer));
+  layer_add_child(s_window_layer, s_complications_layer);
+  layer_add_child(s_window_layer, s_top_bar_layer);
+
+  UnobstructedAreaHandlers ua_handlers = {
+    .change = prv_unobstructed_change,
+    .did_change = prv_unobstructed_did_change
+  };
+  unobstructed_area_service_subscribe(ua_handlers, NULL);
+  prv_update_layout();
 }
 
 static void main_window_unload(Window *window) {
+  unobstructed_area_service_unsubscribe();
   layer_destroy(s_brand_layer);
   text_layer_destroy(s_time_layer);
   layer_destroy(s_complications_layer);
