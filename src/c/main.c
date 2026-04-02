@@ -14,8 +14,9 @@ static Layer *s_complications_layer;
 static Layer *s_top_bar_layer;
 static Layer *s_window_layer;
 
+static GBitmap *s_brand_bitmap;
+
 static GFont s_font_14;
-static GFont s_font_16;
 static GFont s_font_18;
 static GFont s_font_28;
 static GFont s_font_68;
@@ -188,32 +189,16 @@ static void prv_update_display() {
 
 static void brand_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  const char *text = "PEBBLE";
-  int len = 6;
-  int tracking = 3;
+  GSize bmp_size = gbitmap_get_bounds(s_brand_bitmap).size;
+  int x = (bounds.size.w - bmp_size.w) / 2;
+  int y = (bounds.size.h - bmp_size.h) / 2;
 
-  // Measure each character and total width
-  int total_width = 0;
-  GSize char_sizes[6];
-  GRect measure_rect = GRect(0, 0, bounds.size.w, bounds.size.h);
-  for (int i = 0; i < len; i++) {
-    char ch[2] = {text[i], '\0'};
-    char_sizes[i] = graphics_text_layout_get_content_size(
-        ch, s_font_16, measure_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft);
-    total_width += char_sizes[i].w;
-  }
-  total_width += tracking * (len - 1);
-
-  // Draw each character centered
-  int x = (bounds.size.w - total_width) / 2;
-  graphics_context_set_text_color(ctx, s_settings.primary_color);
-  for (int i = 0; i < len; i++) {
-    char ch[2] = {text[i], '\0'};
-    GRect char_rect = GRect(x, 0, char_sizes[i].w, bounds.size.h);
-    graphics_draw_text(ctx, ch, s_font_16, char_rect,
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-    x += char_sizes[i].w + tracking;
-  }
+  #ifdef PBL_COLOR
+    GColor palette[] = {s_settings.primary_color, GColorClear};
+    gbitmap_set_palette(s_brand_bitmap, palette, false);
+  #endif
+  graphics_context_set_compositing_mode(ctx, GCompOpSet);
+  graphics_draw_bitmap_in_rect(ctx, s_brand_bitmap, GRect(x, y, bmp_size.w, bmp_size.h));
 }
 
 static void top_bar_update_proc(Layer *layer, GContext *ctx) {
@@ -359,9 +344,9 @@ static void main_window_load(Window *window) {
   s_window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(s_window_layer);
 
-  // Load custom fonts
+  // Load resources
+  s_brand_bitmap = gbitmap_create_with_resource(RESOURCE_ID_PEBBLE_LOGO);
   s_font_14 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_14));
-  s_font_16 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_16));
   s_font_18 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_18));
   s_font_28 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_28));
   s_font_68 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_68));
@@ -405,8 +390,8 @@ static void main_window_unload(Window *window) {
   text_layer_destroy(s_time_layer);
   layer_destroy(s_complications_layer);
   layer_destroy(s_top_bar_layer);
+  gbitmap_destroy(s_brand_bitmap);
   fonts_unload_custom_font(s_font_14);
-  fonts_unload_custom_font(s_font_16);
   fonts_unload_custom_font(s_font_18);
   fonts_unload_custom_font(s_font_28);
   fonts_unload_custom_font(s_font_68);
