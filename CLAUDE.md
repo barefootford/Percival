@@ -25,6 +25,18 @@ Run `pebble clean` when adding or removing messageKeys in package.json — the b
 - Persistent storage keys: `SETTINGS_KEY = 1` (accent color), `WEATHER_KEY = 2` (cached weather data)
 - Temperature unit is hardcoded to Fahrenheit in the Open-Meteo API call
 
+## Development workflow
+
+After Claude implements a new feature, Claude always verifies the feature visually before considering it done:
+
+1. `pebble clean && pebble build`
+2. `pebble install --emulator emery`
+3. `pebble screenshot --emulator emery` — capture a screenshot
+4. Read the screenshot and evaluate whether the feature looks correct
+5. Iterate if anything is broken or doesn't look right
+
+Do not assume a feature works just because it compiles.
+
 ## Troubleshooting
 
 ### Emulator stuck at 100% CPU / `ConnectionResetError` on install
