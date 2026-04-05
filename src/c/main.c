@@ -68,7 +68,8 @@ static void prv_save_weather() {
 }
 
 static int s_battery_level;
-static char s_status_buffer[24];
+static char s_date_buffer[12];
+static char s_battery_buffer[8];
 
 static void update_status_buffer();
 static void prv_update_display();
@@ -160,8 +161,9 @@ static void update_status_buffer() {
   time_t temp = time(NULL);
   struct tm *t = localtime(&temp);
   static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-  snprintf(s_status_buffer, sizeof(s_status_buffer), "%s %d | %d%%",
-           days[t->tm_wday], t->tm_mday, s_battery_level);
+  snprintf(s_date_buffer, sizeof(s_date_buffer), "%s %d",
+           days[t->tm_wday], t->tm_mday);
+  snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%d%%", s_battery_level);
   if (s_top_bar_layer) {
     layer_mark_dirty(s_top_bar_layer);
   }
@@ -209,7 +211,9 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
 
   graphics_context_set_text_color(ctx, GColorWhite);
   GRect text_rect = GRect(4, 2, bounds.size.w - 8, bounds.size.h);
-  graphics_draw_text(ctx, s_status_buffer, s_font_14,
+  graphics_draw_text(ctx, s_date_buffer, s_font_14,
+                     text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+  graphics_draw_text(ctx, s_battery_buffer, s_font_14,
                      text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
 }
 
