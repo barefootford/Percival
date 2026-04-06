@@ -366,7 +366,9 @@ static void brand_update_proc(Layer *layer, GContext *ctx) {
   int y = (bounds.size.h - bmp_size.h) / 2;
 
   #ifdef PBL_COLOR
-    GColor palette[] = {s_settings.primary_color, GColorClear};
+    static GColor palette[2];
+    palette[0] = s_settings.primary_color;
+    palette[1] = GColorClear;
     gbitmap_set_palette(s_brand_bitmap, palette, false);
   #endif
   graphics_context_set_compositing_mode(ctx, GCompOpSet);
@@ -526,7 +528,9 @@ static void draw_comp_steps(GContext *ctx, int cx, int cy, int radius, GColor fg
   int icon_y = cy + 4 - bmp_size.h;
 
   #ifdef PBL_COLOR
-    GColor palette[] = {fg, GColorClear};
+    static GColor palette[2];
+    palette[0] = fg;
+    palette[1] = GColorClear;
     gbitmap_set_palette(s_sneaker_bitmap, palette, false);
   #endif
   graphics_context_set_compositing_mode(ctx, GCompOpSet);
