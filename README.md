@@ -13,9 +13,9 @@
   <img src="screenshots/percival-green.png" width="120" alt="Hiker — DEN, green">
 </p>
 
-A customizable Pebble watchface with configurable complications. Accent and primary complications are independently selectable:
+A proud Pebble watchface with primary and accent complications.
 
-- **Accent:** Date, steps, battery, sunrise, sunset, year, or month
-- **Primary:** Current weather, daily high/low, sunset, sunrise, or steps
+- **Primary Complications:** Current weather, daily high/low temps, sunrise time, sunset time, or step count.
+- **Accent Complications:** Date, steps, battery, sunrise, sunset, year, or month
 
-Color and complications are configurable through settings.
+Color and complications are configurable through settings on the Pebble app.
