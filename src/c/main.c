@@ -70,6 +70,7 @@ static void prv_save_weather() {
 static int s_battery_level;
 static char s_date_buffer[12];
 static char s_battery_buffer[8];
+static char s_steps_buffer[8];
 
 static void update_status_buffer();
 static void prv_update_display();
@@ -164,6 +165,16 @@ static void update_status_buffer() {
   snprintf(s_date_buffer, sizeof(s_date_buffer), "%s %d",
            days[t->tm_wday], t->tm_mday);
   snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%d%%", s_battery_level);
+
+  int steps = (int)health_service_sum_today(HealthMetricStepCount);
+  if (steps >= 10000) {
+    snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%dk", steps / 1000);
+  } else if (steps >= 1000) {
+    snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%d.%dk", steps / 1000, (steps % 1000) / 100);
+  } else {
+    snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%d", steps);
+  }
+
   if (s_top_bar_layer) {
     layer_mark_dirty(s_top_bar_layer);
   }
@@ -210,11 +221,33 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
   graphics_context_set_text_color(ctx, GColorWhite);
-  GRect text_rect = GRect(4, 2, bounds.size.w - 8, bounds.size.h);
+  int pad = 4;
+  GRect text_rect = GRect(pad, 2, bounds.size.w - pad * 2, bounds.size.h);
   graphics_draw_text(ctx, s_date_buffer, s_font_14,
                      text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+  graphics_draw_text(ctx, s_steps_buffer, s_font_14,
+                     text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
   graphics_draw_text(ctx, s_battery_buffer, s_font_14,
                      text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
+
+  // Separator dots between complications
+  int mid_w = bounds.size.w / 2;
+  GSize date_size = graphics_text_layout_get_content_size(
+      s_date_buffer, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft);
+  GSize steps_size = graphics_text_layout_get_content_size(
+      s_steps_buffer, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
+  GSize batt_size = graphics_text_layout_get_content_size(
+      s_battery_buffer, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentRight);
+  int date_right = pad + date_size.w;
+  int steps_left = mid_w - steps_size.w / 2;
+  int steps_right = mid_w + steps_size.w / 2;
+  int batt_left = bounds.size.w - pad - batt_size.w;
+
+  int dot_y = bounds.size.h / 2;
+  int dot_r = 2;
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_fill_circle(ctx, GPoint((date_right + steps_left) / 2, dot_y), dot_r);
+  graphics_fill_circle(ctx, GPoint((steps_right + batt_left) / 2, dot_y), dot_r);
 }
 
 static void complications_update_proc(Layer *layer, GContext *ctx) {
