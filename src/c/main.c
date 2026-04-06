@@ -117,7 +117,7 @@ static char s_day_buffer[4];
 static char s_sunset_mini_buffer[12];
 static char s_sunrise_mini_buffer[12];
 
-static void update_status_buffer();
+static void update_status_buffer(struct tm *t);
 static void prv_update_display();
 
 static void prv_format_time_buffer(const char *src, char *dest, size_t size, const char *suffix) {
@@ -237,21 +237,26 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
 }
 
-static void update_time() {
-  time_t temp = time(NULL);
-  struct tm *tick_time = localtime(&temp);
+static struct tm *prv_get_time(struct tm *t) {
+  if (t) return t;
+  time_t now = time(NULL);
+  return localtime(&now);
+}
+
+static void update_time(struct tm *tick_time) {
+  struct tm *t = prv_get_time(tick_time);
 
   static char s_time_buffer[8];
   strftime(s_time_buffer, sizeof(s_time_buffer), clock_is_24h_style() ?
-                                                    "%H:%M" : "%I:%M", tick_time);
+                                                    "%H:%M" : "%I:%M", t);
   char *display = s_time_buffer;
   if (display[0] == '0') display++;
   text_layer_set_text(s_time_layer, display);
 }
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
-  update_time();
-  update_status_buffer();
+  update_time(tick_time);
+  update_status_buffer(tick_time);
 
   // Request weather update every 30 minutes (only if phone is connected)
   if (tick_time->tm_min % WEATHER_POLL_MINUTES == 0 &&
@@ -264,9 +269,8 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   }
 }
 
-static void update_status_buffer() {
-  time_t temp = time(NULL);
-  struct tm *t = localtime(&temp);
+static void update_status_buffer(struct tm *tick_time) {
+  struct tm *t = prv_get_time(tick_time);
   static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
   const char *day = days[t->tm_wday];
   snprintf(s_day_buffer, sizeof(s_day_buffer), "%s", day);
@@ -289,7 +293,7 @@ static void update_status_buffer() {
 
 static void battery_callback(BatteryChargeState state) {
   s_battery_level = state.charge_percent;
-  update_status_buffer();
+  update_status_buffer(NULL);
 }
 
 static void bt_callback(bool connected) {
@@ -663,7 +667,7 @@ static void init() {
   });
   window_stack_push(s_main_window, true);
 
-  update_time();
+  update_time(NULL);
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 
   battery_state_service_subscribe(battery_callback);
