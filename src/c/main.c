@@ -6,6 +6,20 @@ extern uint32_t MESSAGE_KEY_TEMP_LOW;
 extern uint32_t MESSAGE_KEY_CITY;
 extern uint32_t MESSAGE_KEY_PrimaryColor;
 extern uint32_t MESSAGE_KEY_SUNSET;
+extern uint32_t MESSAGE_KEY_MiniCompLeft;
+extern uint32_t MESSAGE_KEY_MiniCompMiddle;
+extern uint32_t MESSAGE_KEY_MiniCompRight;
+extern uint32_t MESSAGE_KEY_SUNRISE;
+
+enum MiniCompType {
+  MINI_COMP_NONE = 0,
+  MINI_COMP_DATE = 1,
+  MINI_COMP_STEPS = 2,
+  MINI_COMP_BATTERY = 3,
+  MINI_COMP_DAY = 4,
+  MINI_COMP_SUNSET = 5,
+  MINI_COMP_SUNRISE = 6
+};
 
 static Window *s_main_window;
 static TextLayer *s_time_layer;
@@ -30,12 +44,18 @@ static GFont s_font_68;
 
 typedef struct {
   GColor primary_color;
+  uint8_t mini_comp_left;
+  uint8_t mini_comp_middle;
+  uint8_t mini_comp_right;
 } Settings;
 
 static Settings s_settings;
 
 static void prv_default_settings() {
   s_settings.primary_color = GColorBlack;
+  s_settings.mini_comp_left = MINI_COMP_DATE;
+  s_settings.mini_comp_middle = MINI_COMP_STEPS;
+  s_settings.mini_comp_right = MINI_COMP_BATTERY;
 }
 
 static void prv_load_settings() {
@@ -53,6 +73,7 @@ typedef struct {
   char low[8];
   char city[4];
   char sunset[8];
+  char sunrise[8];
   bool loaded;
 } WeatherCache;
 
@@ -73,9 +94,29 @@ static int s_battery_level;
 static char s_date_buffer[12];
 static char s_battery_buffer[8];
 static char s_steps_buffer[8];
+static char s_day_buffer[4];
+static char s_sunset_mini_buffer[12];
+static char s_sunrise_mini_buffer[12];
 
 static void update_status_buffer();
 static void prv_update_display();
+
+static void prv_format_time_buffer(const char *src, char *dest, size_t size, const char *suffix) {
+  if (s_weather.loaded && src[0]) {
+    snprintf(dest, size, "%s%s", src, suffix);
+  } else {
+    snprintf(dest, size, "--");
+  }
+}
+
+static void prv_update_mini_weather_buffers() {
+  prv_format_time_buffer(s_weather.sunset, s_sunset_mini_buffer, sizeof(s_sunset_mini_buffer), "p");
+  prv_format_time_buffer(s_weather.sunrise, s_sunrise_mini_buffer, sizeof(s_sunrise_mini_buffer), "a");
+}
+
+static uint8_t prv_tuple_to_uint8(Tuple *t) {
+  return t->type == TUPLE_CSTRING ? (uint8_t)atoi(t->value->cstring) : (uint8_t)t->value->int32;
+}
 
 
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
@@ -104,18 +145,47 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     snprintf(s_weather.sunset, sizeof(s_weather.sunset), "%s", sunset_tuple->value->cstring);
   }
 
-  if (temp_tuple || high_tuple || low_tuple || city_tuple || sunset_tuple) {
+  Tuple *sunrise_tuple = dict_find(iterator, MESSAGE_KEY_SUNRISE);
+  if (sunrise_tuple) {
+    snprintf(s_weather.sunrise, sizeof(s_weather.sunrise), "%s", sunrise_tuple->value->cstring);
+  }
+
+  if (temp_tuple || high_tuple || low_tuple || city_tuple || sunset_tuple || sunrise_tuple) {
     s_weather.loaded = true;
     prv_save_weather();
+    prv_update_mini_weather_buffers();
     if (s_complications_layer) {
       layer_mark_dirty(s_complications_layer);
+    }
+    if (s_top_bar_layer) {
+      layer_mark_dirty(s_top_bar_layer);
     }
   }
 
   // Settings
-  Tuple *accent_t = dict_find(iterator, MESSAGE_KEY_PrimaryColor);
-  if (accent_t) {
-    s_settings.primary_color = GColorFromHEX(accent_t->value->int32);
+  Tuple *color_t = dict_find(iterator, MESSAGE_KEY_PrimaryColor);
+  Tuple *left_t = dict_find(iterator, MESSAGE_KEY_MiniCompLeft);
+  Tuple *mid_t = dict_find(iterator, MESSAGE_KEY_MiniCompMiddle);
+  Tuple *right_t = dict_find(iterator, MESSAGE_KEY_MiniCompRight);
+
+  bool settings_changed = false;
+  if (color_t) {
+    s_settings.primary_color = GColorFromHEX(color_t->value->int32);
+    settings_changed = true;
+  }
+  if (left_t) {
+    s_settings.mini_comp_left = prv_tuple_to_uint8(left_t);
+    settings_changed = true;
+  }
+  if (mid_t) {
+    s_settings.mini_comp_middle = prv_tuple_to_uint8(mid_t);
+    settings_changed = true;
+  }
+  if (right_t) {
+    s_settings.mini_comp_right = prv_tuple_to_uint8(right_t);
+    settings_changed = true;
+  }
+  if (settings_changed) {
     prv_save_settings();
     prv_update_display();
   }
@@ -164,8 +234,9 @@ static void update_status_buffer() {
   time_t temp = time(NULL);
   struct tm *t = localtime(&temp);
   static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-  snprintf(s_date_buffer, sizeof(s_date_buffer), "%s %d",
-           days[t->tm_wday], t->tm_mday);
+  const char *day = days[t->tm_wday];
+  snprintf(s_day_buffer, sizeof(s_day_buffer), "%s", day);
+  snprintf(s_date_buffer, sizeof(s_date_buffer), "%s %d", day, t->tm_mday);
   snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%d%%", s_battery_level);
 
   int steps = (int)health_service_sum_today(HealthMetricStepCount);
@@ -230,40 +301,72 @@ static void brand_update_proc(Layer *layer, GContext *ctx) {
   graphics_draw_bitmap_in_rect(ctx, s_brand_bitmap, GRect(x, y, bmp_size.w, bmp_size.h));
 }
 
+static const char* get_mini_comp_text(uint8_t type) {
+  switch (type) {
+    case MINI_COMP_DATE: return s_date_buffer;
+    case MINI_COMP_STEPS: return s_steps_buffer;
+    case MINI_COMP_BATTERY: return s_battery_buffer;
+    case MINI_COMP_DAY: return s_day_buffer;
+    case MINI_COMP_SUNSET: return s_sunset_mini_buffer;
+    case MINI_COMP_SUNRISE: return s_sunrise_mini_buffer;
+    default: return NULL;
+  }
+}
+
 static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
 
   graphics_context_set_fill_color(ctx, s_settings.primary_color);
   graphics_fill_rect(ctx, bounds, 0, GCornerNone);
 
+  const char *left = get_mini_comp_text(s_settings.mini_comp_left);
+  const char *mid = get_mini_comp_text(s_settings.mini_comp_middle);
+  const char *right = get_mini_comp_text(s_settings.mini_comp_right);
+
   graphics_context_set_text_color(ctx, GColorWhite);
   int pad = 4;
   GRect text_rect = GRect(pad, 2, bounds.size.w - pad * 2, bounds.size.h);
-  graphics_draw_text(ctx, s_date_buffer, s_font_14,
-                     text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  graphics_draw_text(ctx, s_steps_buffer, s_font_14,
-                     text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-  graphics_draw_text(ctx, s_battery_buffer, s_font_14,
-                     text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
 
-  // Separator dots between complications
-  int mid_w = bounds.size.w / 2;
-  GSize date_size = graphics_text_layout_get_content_size(
-      s_date_buffer, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft);
-  GSize steps_size = graphics_text_layout_get_content_size(
-      s_steps_buffer, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
-  GSize batt_size = graphics_text_layout_get_content_size(
-      s_battery_buffer, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentRight);
-  int date_right = pad + date_size.w;
-  int steps_left = mid_w - steps_size.w / 2;
-  int steps_right = mid_w + steps_size.w / 2;
-  int batt_left = bounds.size.w - pad - batt_size.w;
+  if (left) {
+    graphics_draw_text(ctx, left, s_font_14, text_rect,
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+  }
+  if (mid) {
+    graphics_draw_text(ctx, mid, s_font_14, text_rect,
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  }
+  if (right) {
+    graphics_draw_text(ctx, right, s_font_14, text_rect,
+                       GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
+  }
 
+  // Separator dots between adjacent non-empty complications
+  int center_x = bounds.size.w / 2;
   int dot_y = bounds.size.h / 2;
   int dot_r = 2;
   graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_fill_circle(ctx, GPoint((date_right + steps_left) / 2, dot_y), dot_r);
-  graphics_fill_circle(ctx, GPoint((steps_right + batt_left) / 2, dot_y), dot_r);
+
+  GSize left_size = left ? graphics_text_layout_get_content_size(
+      left, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft) : GSizeZero;
+  GSize mid_size = mid ? graphics_text_layout_get_content_size(
+      mid, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter) : GSizeZero;
+  GSize right_size = right ? graphics_text_layout_get_content_size(
+      right, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentRight) : GSizeZero;
+
+  int left_edge = pad + left_size.w;
+  int mid_left = center_x - mid_size.w / 2;
+  int mid_right = center_x + mid_size.w / 2;
+  int right_edge = bounds.size.w - pad - right_size.w;
+
+  if (left && mid) {
+    graphics_fill_circle(ctx, GPoint((left_edge + mid_left) / 2, dot_y), dot_r);
+  }
+  if (mid && right) {
+    graphics_fill_circle(ctx, GPoint((mid_right + right_edge) / 2, dot_y), dot_r);
+  }
+  if (left && !mid && right) {
+    graphics_fill_circle(ctx, GPoint((left_edge + right_edge) / 2, dot_y), dot_r);
+  }
 }
 
 static void complications_update_proc(Layer *layer, GContext *ctx) {
@@ -462,6 +565,7 @@ static void main_window_unload(Window *window) {
 static void init() {
   prv_load_settings();
   prv_load_weather();
+  prv_update_mini_weather_buffers();
   s_main_window = window_create();
   window_set_background_color(s_main_window, GColorWhite);
   window_set_window_handlers(s_main_window, (WindowHandlers) {

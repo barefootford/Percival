@@ -64,13 +64,15 @@ function locationSuccess(pos) {
     cachedCity = cityInitials;
 
     var set = formatTo12h(weatherData.daily.sunset[0]);
+    var rise = formatTo12h(weatherData.daily.sunrise[0]);
 
     Pebble.sendAppMessage({
       'TEMPERATURE': Math.round(weatherData.current.temperature_2m),
       'TEMP_HIGH': Math.round(weatherData.daily.temperature_2m_max[0]),
       'TEMP_LOW': Math.round(weatherData.daily.temperature_2m_min[0]),
       'CITY': cityInitials,
-      'SUNSET': set
+      'SUNSET': set,
+      'SUNRISE': rise
     },
       function (e) { console.log('Weather sent successfully'); },
       function (e) { console.log('Error sending weather: ' + JSON.stringify(e)); }

@@ -33,7 +33,11 @@
       "TEMP_LOW": 2,
       "CITY": 3,
       "PrimaryColor": 4,
-      "SUNSET": 5
+      "SUNSET": 5,
+      "MiniCompLeft": 6,
+      "MiniCompMiddle": 7,
+      "MiniCompRight": 8,
+      "SUNRISE": 9
     },
     "resources": {
       "media": [
