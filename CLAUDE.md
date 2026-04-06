@@ -25,6 +25,10 @@ Run `pebble clean` when adding or removing messageKeys in package.json — the b
 - Persistent storage keys: `SETTINGS_KEY = 1` (accent color), `WEATHER_KEY = 2` (cached weather data)
 - Temperature unit is hardcoded to Fahrenheit in the Open-Meteo API call
 
+## Marketing screenshots
+
+Always use the `/marketing-screenshots` skill when generating or updating screenshots for README.md. It defines the full stubbing procedure (settings, weather, time, date, AppMessage disabling, emulator flags, and revert steps).
+
 ## Development workflow
 
 After Claude implements a new feature, Claude always verifies the feature visually before considering it done:
