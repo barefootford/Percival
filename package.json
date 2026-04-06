@@ -37,7 +37,10 @@
       "MiniCompLeft": 6,
       "MiniCompMiddle": 7,
       "MiniCompRight": 8,
-      "SUNRISE": 9
+      "SUNRISE": 9,
+      "BottomCompLeft": 10,
+      "BottomCompPrimary": 11,
+      "BottomCompRight": 12
     },
     "resources": {
       "media": [

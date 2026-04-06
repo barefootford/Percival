@@ -10,6 +10,9 @@ extern uint32_t MESSAGE_KEY_MiniCompLeft;
 extern uint32_t MESSAGE_KEY_MiniCompMiddle;
 extern uint32_t MESSAGE_KEY_MiniCompRight;
 extern uint32_t MESSAGE_KEY_SUNRISE;
+extern uint32_t MESSAGE_KEY_BottomCompLeft;
+extern uint32_t MESSAGE_KEY_BottomCompPrimary;
+extern uint32_t MESSAGE_KEY_BottomCompRight;
 
 enum MiniCompType {
   MINI_COMP_NONE = 0,
@@ -19,6 +22,14 @@ enum MiniCompType {
   MINI_COMP_DAY = 4,
   MINI_COMP_SUNSET = 5,
   MINI_COMP_SUNRISE = 6
+};
+
+enum BottomCompType {
+  BOTTOM_COMP_NONE = 0,
+  BOTTOM_COMP_HIGHLOW = 1,
+  BOTTOM_COMP_WEATHER = 2,
+  BOTTOM_COMP_SUNSET = 3,
+  BOTTOM_COMP_SUNRISE = 4
 };
 
 static Window *s_main_window;
@@ -47,6 +58,9 @@ typedef struct {
   uint8_t mini_comp_left;
   uint8_t mini_comp_middle;
   uint8_t mini_comp_right;
+  uint8_t bottom_comp_left;
+  uint8_t bottom_comp_primary;
+  uint8_t bottom_comp_right;
 } Settings;
 
 static Settings s_settings;
@@ -56,6 +70,9 @@ static void prv_default_settings() {
   s_settings.mini_comp_left = MINI_COMP_DATE;
   s_settings.mini_comp_middle = MINI_COMP_STEPS;
   s_settings.mini_comp_right = MINI_COMP_BATTERY;
+  s_settings.bottom_comp_left = BOTTOM_COMP_HIGHLOW;
+  s_settings.bottom_comp_primary = BOTTOM_COMP_WEATHER;
+  s_settings.bottom_comp_right = BOTTOM_COMP_SUNSET;
 }
 
 static void prv_load_settings() {
@@ -167,6 +184,9 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   Tuple *left_t = dict_find(iterator, MESSAGE_KEY_MiniCompLeft);
   Tuple *mid_t = dict_find(iterator, MESSAGE_KEY_MiniCompMiddle);
   Tuple *right_t = dict_find(iterator, MESSAGE_KEY_MiniCompRight);
+  Tuple *bleft_t = dict_find(iterator, MESSAGE_KEY_BottomCompLeft);
+  Tuple *bpri_t = dict_find(iterator, MESSAGE_KEY_BottomCompPrimary);
+  Tuple *bright_t = dict_find(iterator, MESSAGE_KEY_BottomCompRight);
 
   bool settings_changed = false;
   if (color_t) {
@@ -183,6 +203,18 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   }
   if (right_t) {
     s_settings.mini_comp_right = prv_tuple_to_uint8(right_t);
+    settings_changed = true;
+  }
+  if (bleft_t) {
+    s_settings.bottom_comp_left = prv_tuple_to_uint8(bleft_t);
+    settings_changed = true;
+  }
+  if (bpri_t) {
+    s_settings.bottom_comp_primary = prv_tuple_to_uint8(bpri_t);
+    settings_changed = true;
+  }
+  if (bright_t) {
+    s_settings.bottom_comp_right = prv_tuple_to_uint8(bright_t);
     settings_changed = true;
   }
   if (settings_changed) {
@@ -369,103 +401,135 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   }
 }
 
+static void draw_comp_highlow(GContext *ctx, int cx, int cy, int radius, GColor fg) {
+  graphics_context_set_text_color(ctx, fg);
+  GRect top_rect = GRect(cx - radius, cy - radius + 7, radius * 2, radius - 7);
+  graphics_draw_text(ctx, s_weather.loaded ? s_weather.high : "--", s_font_18,
+                     top_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+
+  int line_margin = 10;
+  graphics_context_set_stroke_color(ctx, fg);
+  graphics_context_set_stroke_width(ctx, 1);
+  graphics_draw_line(ctx, GPoint(cx - radius + line_margin, cy),
+                         GPoint(cx + radius - line_margin, cy));
+
+  GRect bot_rect = GRect(cx - radius, cy + 2, radius * 2, radius - 2);
+  graphics_draw_text(ctx, s_weather.loaded ? s_weather.low : "--", s_font_18,
+                     bot_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
+static void draw_comp_weather(GContext *ctx, int cx, int cy, int radius, GColor fg) {
+  const char *city = s_weather.loaded ? s_weather.city : "--";
+  const char *temp = s_weather.loaded ? s_weather.temp : "--";
+
+  graphics_context_set_text_color(ctx, fg);
+  GRect city_rect = GRect(cx - radius, cy - radius + 7, radius * 2, 18);
+  graphics_draw_text(ctx, city, s_font_14, city_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  GRect temp_rect = GRect(cx - radius, cy - 8, radius * 2, 34);
+  graphics_draw_text(ctx, temp, s_font_28, temp_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  if (s_weather.loaded) {
+    GSize ts = graphics_text_layout_get_content_size(
+        temp, s_font_28, temp_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
+    graphics_context_set_stroke_color(ctx, fg);
+    graphics_context_set_stroke_width(ctx, 1);
+    graphics_draw_circle(ctx, GPoint(cx + ts.w / 2 + 3, temp_rect.origin.y + 7), 2);
+  }
+}
+
+static void draw_comp_sun(GContext *ctx, int cx, int cy, int radius,
+                          GColor fg, GColor bg, const char *time_str, bool fill_sun) {
+  int sun_r = 12;
+  int horizon_y = cy - 2;
+
+  if (fill_sun) {
+    graphics_context_set_fill_color(ctx, fg);
+    graphics_fill_circle(ctx, GPoint(cx, horizon_y), sun_r);
+    graphics_context_set_fill_color(ctx, bg);
+    graphics_fill_rect(ctx, GRect(cx - sun_r - 1, horizon_y, sun_r * 2 + 2, sun_r + 2), 0, GCornerNone);
+  } else {
+    graphics_context_set_stroke_color(ctx, fg);
+    graphics_context_set_stroke_width(ctx, 2);
+    graphics_draw_circle(ctx, GPoint(cx, horizon_y), sun_r);
+    // Mask bottom half of the stroked circle
+    graphics_context_set_fill_color(ctx, bg);
+    graphics_fill_rect(ctx, GRect(cx - sun_r - 1, horizon_y, sun_r * 2 + 2, sun_r + 2), 0, GCornerNone);
+  }
+
+  graphics_context_set_stroke_color(ctx, fg);
+  graphics_context_set_stroke_width(ctx, 2);
+  int hz_w = sun_r + 8;
+  graphics_draw_line(ctx, GPoint(cx - hz_w, horizon_y), GPoint(cx + hz_w, horizon_y));
+
+  int ray_start = sun_r + 3;
+  int ray_end = sun_r + 7;
+  graphics_draw_line(ctx, GPoint(cx, horizon_y - ray_start),
+                         GPoint(cx, horizon_y - ray_end));
+  int ds = ray_start * 7 / 10;
+  int de = ray_end * 7 / 10;
+  graphics_draw_line(ctx, GPoint(cx - ds, horizon_y - ds),
+                         GPoint(cx - de, horizon_y - de));
+  graphics_draw_line(ctx, GPoint(cx + ds, horizon_y - ds),
+                         GPoint(cx + de, horizon_y - de));
+
+  graphics_context_set_text_color(ctx, fg);
+  GRect time_rect = GRect(cx - radius, cy, radius * 2, 24);
+  graphics_draw_text(ctx, time_str, s_font_18, time_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
+static void draw_bottom_comp(GContext *ctx, uint8_t type, int cx, int cy, int radius, bool is_primary) {
+  if (type == BOTTOM_COMP_NONE) return;
+
+  GColor fg, bg;
+  if (is_primary) {
+    fg = GColorWhite;
+    bg = s_settings.primary_color;
+    graphics_context_set_fill_color(ctx, s_settings.primary_color);
+    graphics_fill_circle(ctx, GPoint(cx, cy), radius);
+  } else {
+    fg = s_settings.primary_color;
+    bg = GColorWhite;
+    graphics_context_set_stroke_color(ctx, s_settings.primary_color);
+    graphics_context_set_stroke_width(ctx, 2);
+    graphics_draw_circle(ctx, GPoint(cx, cy), radius);
+  }
+
+  switch (type) {
+    case BOTTOM_COMP_HIGHLOW:
+      draw_comp_highlow(ctx, cx, cy, radius, fg);
+      break;
+    case BOTTOM_COMP_WEATHER:
+      draw_comp_weather(ctx, cx, cy, radius, fg);
+      break;
+    case BOTTOM_COMP_SUNSET: {
+      const char *set = (s_weather.loaded && s_weather.sunset[0]) ? s_weather.sunset : "--";
+      draw_comp_sun(ctx, cx, cy, radius, fg, bg, set, true);
+      break;
+    }
+    case BOTTOM_COMP_SUNRISE: {
+      const char *rise = (s_weather.loaded && s_weather.sunrise[0]) ? s_weather.sunrise : "--";
+      draw_comp_sun(ctx, cx, cy, radius, fg, bg, rise, false);
+      break;
+    }
+  }
+}
+
 static void complications_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
 
   int circle_radius = 30;
   int y_center = bounds.size.h / 2;
 
-  // Three complications evenly spaced
   int section_w = bounds.size.w / 3;
   int cx1 = section_w / 2;
   int cx2 = section_w + section_w / 2;
   int cx3 = 2 * section_w + section_w / 2;
 
-  // === Left: High/Low stroked circle ===
-  graphics_context_set_stroke_color(ctx, s_settings.primary_color);
-  graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_circle(ctx, GPoint(cx1, y_center), circle_radius);
-
-  graphics_context_set_text_color(ctx, s_settings.primary_color);
-  GRect top_rect = GRect(cx1 - circle_radius, y_center - circle_radius + 7,
-                          circle_radius * 2, circle_radius - 7);
-  graphics_draw_text(ctx, s_weather.loaded ? s_weather.high : "--", s_font_18,
-                     top_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-
-  int line_margin = 10;
-  graphics_context_set_stroke_width(ctx, 1);
-  graphics_draw_line(ctx, GPoint(cx1 - circle_radius + line_margin, y_center),
-                         GPoint(cx1 + circle_radius - line_margin, y_center));
-
-  GRect bot_rect = GRect(cx1 - circle_radius, y_center + 2,
-                          circle_radius * 2, circle_radius - 2);
-  graphics_draw_text(ctx, s_weather.loaded ? s_weather.low : "--", s_font_18,
-                     bot_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-
-  // === Center: Filled circle, city + current temp ===
-  const char *city = s_weather.loaded ? s_weather.city : "--";
-  const char *temp = s_weather.loaded ? s_weather.temp : "--";
-
-  graphics_context_set_fill_color(ctx, s_settings.primary_color);
-  graphics_fill_circle(ctx, GPoint(cx2, y_center), circle_radius);
-
-  graphics_context_set_text_color(ctx, GColorWhite);
-  GRect city_rect = GRect(cx2 - circle_radius, y_center - circle_radius + 7,
-                            circle_radius * 2, 18);
-  graphics_draw_text(ctx, city, s_font_14, city_rect,
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-  GRect temp_rect = GRect(cx2 - circle_radius, y_center - 8,
-                            circle_radius * 2, 34);
-  graphics_draw_text(ctx, temp, s_font_28, temp_rect,
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-  if (s_weather.loaded) {
-    GSize ts = graphics_text_layout_get_content_size(
-        temp, s_font_28, temp_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
-    graphics_context_set_stroke_color(ctx, GColorWhite);
-    graphics_context_set_stroke_width(ctx, 1);
-    graphics_draw_circle(ctx, GPoint(cx2 + ts.w / 2 + 3, temp_rect.origin.y + 7), 2);
-  }
-
-  // === Right: Sunset stroked circle with glyph ===
-  const char *set = (s_weather.loaded && s_weather.sunset[0]) ? s_weather.sunset : "--";
-
-  graphics_context_set_stroke_color(ctx, s_settings.primary_color);
-  graphics_context_set_stroke_width(ctx, 2);
-  graphics_draw_circle(ctx, GPoint(cx3, y_center), circle_radius);
-
-  // Sunset glyph: semicircle + horizon + rays
-  int sun_r = 12;
-  int horizon_y = y_center - 2;
-
-  // Draw full sun, then mask bottom half
-  graphics_context_set_fill_color(ctx, s_settings.primary_color);
-  graphics_fill_circle(ctx, GPoint(cx3, horizon_y), sun_r);
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  graphics_fill_rect(ctx, GRect(cx3 - sun_r - 1, horizon_y, sun_r * 2 + 2, sun_r + 2), 0, GCornerNone);
-
-  // Horizon line
-  graphics_context_set_stroke_color(ctx, s_settings.primary_color);
-  graphics_context_set_stroke_width(ctx, 1);
-  int hz_w = sun_r + 8;
-  graphics_draw_line(ctx, GPoint(cx3 - hz_w, horizon_y), GPoint(cx3 + hz_w, horizon_y));
-
-  // Rays (up, 45° left, 45° right)
-  int ray_start = sun_r + 3;
-  int ray_end = sun_r + 7;
-  graphics_draw_line(ctx, GPoint(cx3, horizon_y - ray_start),
-                         GPoint(cx3, horizon_y - ray_end));
-  int ds = ray_start * 7 / 10;
-  int de = ray_end * 7 / 10;
-  graphics_draw_line(ctx, GPoint(cx3 - ds, horizon_y - ds),
-                         GPoint(cx3 - de, horizon_y - de));
-  graphics_draw_line(ctx, GPoint(cx3 + ds, horizon_y - ds),
-                         GPoint(cx3 + de, horizon_y - de));
-
-  // Sunset time in lower half
-  graphics_context_set_text_color(ctx, s_settings.primary_color);
-  GRect set_rect = GRect(cx3 - circle_radius, y_center, circle_radius * 2, 24);
-  graphics_draw_text(ctx, set, s_font_18, set_rect,
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  draw_bottom_comp(ctx, s_settings.bottom_comp_left, cx1, y_center, circle_radius, false);
+  draw_bottom_comp(ctx, s_settings.bottom_comp_primary, cx2, y_center, circle_radius, true);
+  draw_bottom_comp(ctx, s_settings.bottom_comp_right, cx3, y_center, circle_radius, false);
 }
 
 static void prv_update_layout() {

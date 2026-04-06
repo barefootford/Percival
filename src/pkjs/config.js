@@ -8,6 +8,21 @@ var miniCompOptions = [
   {"label": "Sunrise", "value": 6}
 ];
 
+var bottomCompOptions = [
+  {"label": "None", "value": 0},
+  {"label": "High / Low", "value": 1},
+  {"label": "Weather", "value": 2},
+  {"label": "Sunset", "value": 3},
+  {"label": "Sunrise", "value": 4}
+];
+
+var bottomCompPrimaryOptions = [
+  {"label": "High / Low", "value": 1},
+  {"label": "Weather", "value": 2},
+  {"label": "Sunset", "value": 3},
+  {"label": "Sunrise", "value": 4}
+];
+
 module.exports = [
   {
     "type": "heading",
@@ -51,6 +66,36 @@ module.exports = [
         "label": "Right",
         "defaultValue": 3,
         "options": miniCompOptions
+      }
+    ]
+  },
+  {
+    "type": "section",
+    "items": [
+      {
+        "type": "heading",
+        "defaultValue": "Bottom Complications"
+      },
+      {
+        "type": "select",
+        "messageKey": "BottomCompLeft",
+        "label": "Left",
+        "defaultValue": 1,
+        "options": bottomCompOptions
+      },
+      {
+        "type": "select",
+        "messageKey": "BottomCompPrimary",
+        "label": "Primary",
+        "defaultValue": 2,
+        "options": bottomCompPrimaryOptions
+      },
+      {
+        "type": "select",
+        "messageKey": "BottomCompRight",
+        "label": "Right",
+        "defaultValue": 3,
+        "options": bottomCompOptions
       }
     ]
   },
