@@ -19,9 +19,10 @@ enum MiniCompType {
   MINI_COMP_DATE = 1,
   MINI_COMP_STEPS = 2,
   MINI_COMP_BATTERY = 3,
-  MINI_COMP_DAY = 4,
+  MINI_COMP_YEAR = 4,
   MINI_COMP_SUNSET = 5,
-  MINI_COMP_SUNRISE = 6
+  MINI_COMP_SUNRISE = 6,
+  MINI_COMP_MONTH = 7
 };
 
 enum BottomCompType {
@@ -139,7 +140,8 @@ static int s_battery_level;
 static char s_date_buffer[12];
 static char s_battery_buffer[8];
 static char s_steps_buffer[8];
-static char s_day_buffer[4];
+static char s_year_buffer[6];
+static char s_month_buffer[5];
 static char s_sunset_mini_buffer[12];
 static char s_sunrise_mini_buffer[12];
 
@@ -300,7 +302,10 @@ static void update_status_buffer(struct tm *tick_time) {
   struct tm *t = get_time(tick_time);
   static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
   const char *day = days[t->tm_wday];
-  snprintf(s_day_buffer, sizeof(s_day_buffer), "%s", day);
+  static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "June",
+                                   "July", "Aug", "Sep", "Oct", "Nov", "Dec"};
+  snprintf(s_year_buffer, sizeof(s_year_buffer), "%d", t->tm_year + 1900);
+  snprintf(s_month_buffer, sizeof(s_month_buffer), "%s", months[t->tm_mon]);
   snprintf(s_date_buffer, sizeof(s_date_buffer), "%s %d", day, t->tm_mday);
   snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%d%%", s_battery_level);
 
@@ -373,9 +378,10 @@ static const char* get_mini_comp_text(uint8_t type) {
     case MINI_COMP_DATE: return s_date_buffer;
     case MINI_COMP_STEPS: return s_steps_buffer;
     case MINI_COMP_BATTERY: return s_battery_buffer;
-    case MINI_COMP_DAY: return s_day_buffer;
+    case MINI_COMP_YEAR: return s_year_buffer;
     case MINI_COMP_SUNSET: return s_sunset_mini_buffer;
     case MINI_COMP_SUNRISE: return s_sunrise_mini_buffer;
+    case MINI_COMP_MONTH: return s_month_buffer;
     default: return NULL;
   }
 }

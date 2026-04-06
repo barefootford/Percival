@@ -3,9 +3,10 @@ var miniCompOptions = [
   {"label": "Date", "value": 1},
   {"label": "Step Count", "value": 2},
   {"label": "Battery Life", "value": 3},
-  {"label": "Day of Week", "value": 4},
+  {"label": "Year", "value": 4},
   {"label": "Sunset", "value": 5},
-  {"label": "Sunrise", "value": 6}
+  {"label": "Sunrise", "value": 6},
+  {"label": "Month", "value": 7}
 ];
 
 var bottomCompOptions = [
