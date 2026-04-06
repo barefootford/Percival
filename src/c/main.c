@@ -67,6 +67,15 @@ typedef struct {
 
 static Settings s_settings;
 
+static bool prv_needs_steps() {
+  return (s_settings.mini_comp_left == MINI_COMP_STEPS ||
+          s_settings.mini_comp_middle == MINI_COMP_STEPS ||
+          s_settings.mini_comp_right == MINI_COMP_STEPS ||
+          s_settings.bottom_comp_left == BOTTOM_COMP_STEPS ||
+          s_settings.bottom_comp_primary == BOTTOM_COMP_STEPS ||
+          s_settings.bottom_comp_right == BOTTOM_COMP_STEPS);
+}
+
 static void prv_default_settings() {
   s_settings.primary_color = GColorBlack;
   s_settings.mini_comp_left = MINI_COMP_DATE;
@@ -277,13 +286,15 @@ static void update_status_buffer(struct tm *tick_time) {
   snprintf(s_date_buffer, sizeof(s_date_buffer), "%s %d", day, t->tm_mday);
   snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%d%%", s_battery_level);
 
-  int steps = (int)health_service_sum_today(HealthMetricStepCount);
-  if (steps >= 10000) {
-    snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%dk", steps / 1000);
-  } else if (steps >= 1000) {
-    snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%d.%dk", steps / 1000, (steps % 1000) / 100);
-  } else {
-    snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%d", steps);
+  if (prv_needs_steps()) {
+    int steps = (int)health_service_sum_today(HealthMetricStepCount);
+    if (steps >= 10000) {
+      snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%dk", steps / 1000);
+    } else if (steps >= 1000) {
+      snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%d.%dk", steps / 1000, (steps % 1000) / 100);
+    } else {
+      snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%d", steps);
+    }
   }
 
   if (s_top_bar_layer) {
