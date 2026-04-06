@@ -6,9 +6,12 @@ var clay = new Clay(clayConfig);
 
 var xhrRequest = function (url, type, callback) {
   var xhr = new XMLHttpRequest();
+  xhr.timeout = 15000;
   xhr.onload = function () {
-    callback(this.responseText);
+    callback(xhr.status === 200 ? this.responseText : null);
   };
+  xhr.onerror = function () { callback(null); };
+  xhr.ontimeout = function () { callback(null); };
   xhr.open(type, url);
   xhr.send();
 };
@@ -74,19 +77,26 @@ function locationSuccess(pos) {
 
   var needGeo = locationMoved(lat, lon);
   var weatherData = null;
-  var cityInitials = cachedCity;
+  var cityInitials = cachedCity || '';
   var pending = needGeo ? 2 : 1;
 
   function trySend() {
     pending--;
     if (pending > 0) return;
+    if (!weatherData) return;
+
+    var set, rise;
+    try {
+      set = formatTo12h(weatherData.daily.sunset[0]);
+      rise = formatTo12h(weatherData.daily.sunrise[0]);
+    } catch (e) {
+      console.log('Error parsing sun times: ' + e);
+      return;
+    }
 
     lastLat = lat;
     lastLon = lon;
     cachedCity = cityInitials;
-
-    var set = formatTo12h(weatherData.daily.sunset[0]);
-    var rise = formatTo12h(weatherData.daily.sunrise[0]);
 
     Pebble.sendAppMessage({
       'TEMPERATURE': Math.round(weatherData.current.temperature_2m),
@@ -102,8 +112,14 @@ function locationSuccess(pos) {
   }
 
   xhrRequest(weatherUrl, 'GET', function (weatherResp) {
+    if (!weatherResp) {
+      console.log('Weather request failed');
+      trySend();
+      return;
+    }
     try { weatherData = JSON.parse(weatherResp); } catch (e) {
       console.log('Weather parse error: ' + e);
+      trySend();
       return;
     }
     trySend();
@@ -114,12 +130,18 @@ function locationSuccess(pos) {
       'latitude=' + lat + '&longitude=' + lon + '&localityLanguage=en';
 
     xhrRequest(geoUrl, 'GET', function (geoResp) {
-      try { var geo = JSON.parse(geoResp); } catch (e) {
-        console.log('Geocode parse error: ' + e);
+      if (!geoResp) {
+        console.log('Geocode request failed, using blank city');
+        trySend();
         return;
       }
-      var city = geo.city || geo.locality || '?';
-      cityInitials = getCityInitials(city);
+      try { var geo = JSON.parse(geoResp); } catch (e) {
+        console.log('Geocode parse error: ' + e);
+        trySend();
+        return;
+      }
+      var city = geo.city || geo.locality || '';
+      cityInitials = city ? getCityInitials(city) : '';
       trySend();
     });
   }
