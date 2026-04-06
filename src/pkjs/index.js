@@ -18,12 +18,34 @@ var lastLat = null;
 var lastLon = null;
 var LOCATION_THRESHOLD = 0.01; // ~1km movement before re-fetching city
 
+var CITY_ABBREVIATIONS = {
+  // Multi-word cities where initials are ambiguous or wrong
+  'coeur dalene': 'CDA',   // API returns "Coeur d'Alene"
+  'salt lake city': 'SLC', // API returns "Salt Lake City"
+  'oklahoma city': 'OKC',  // API returns "Oklahoma City"
+  'new orleans': 'NLA',    // API returns "New Orleans"
+  'fort worth': 'FTW',     // API returns "Fort Worth"
+  'fort collins': 'FTC',   // API returns "Fort Collins"
+  // St. cities where "SL", "SP" etc. are confusing
+  'st louis': 'STL',       // API returns "St. Louis" → normalizes to "st louis"
+  'saint louis': 'STL',
+  'saint paul': 'STP',     // API returns "Saint Paul"
+  'st paul': 'STP',
+  'st petersburg': 'SPB',  // API returns "St. Petersburg" → normalizes to "st petersburg"
+  'saint petersburg': 'SPB',
+  'st george': 'STG',
+  'saint george': 'STG',
+};
+
 function getCityInitials(name) {
+  var normalized = name.trim().toLowerCase().replace(/['.]/g, '');
+  var lookup = CITY_ABBREVIATIONS[normalized];
+  if (lookup) return lookup;
   var words = name.trim().split(/\s+/);
   if (words.length >= 2) {
     return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
   }
-  return words[0].charAt(0).toUpperCase();
+  return words[0].substring(0, 3).toUpperCase();
 }
 
 function formatTo12h(isoString) {
