@@ -1,16 +1,14 @@
 # Percival
 
 <p align="center">
-  <img src="screenshots/percival-dark-blue.png" width="160" alt="Dark blue accent — SF">&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="screenshots/percival-dark-red.png" width="160" alt="Dark red accent — NY">&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="screenshots/percival-black.png" width="160" alt="Black accent">
+  <img src="screenshots/percival-black.png" width="160" alt="Professional — NY, black">&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/percival-blue.png" width="160" alt="Runner — LA, blue">&nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/percival-purple.png" width="160" alt="Commuter — DC, purple">
 </p>
 
-A weather-focused Pebble watchface. Three location aware complications show:
-- Current temperature
-- Daily high/low
-- Sunset time
+A customizable Pebble watchface with configurable complications. Accent and primary complications are independently selectable:
 
-Weather data is pulled from the Open-Meteo API every 30 minutes. Location is resolved through GPS coordinates via BigDataCloud. Cached when location changes less than 1km.
+- **Accent:** Date, steps, battery, sunrise, sunset, year, or month
+- **Primary:** Current weather, daily high/low, sunset, sunrise, or steps
 
-Color is configurable through settings.
+Color and complications are configurable through settings.
