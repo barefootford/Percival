@@ -13,14 +13,16 @@ var bottomCompOptions = [
   {"label": "High / Low", "value": 1},
   {"label": "Weather", "value": 2},
   {"label": "Sunset", "value": 3},
-  {"label": "Sunrise", "value": 4}
+  {"label": "Sunrise", "value": 4},
+  {"label": "Step Count", "value": 5}
 ];
 
 var bottomCompPrimaryOptions = [
   {"label": "High / Low", "value": 1},
   {"label": "Weather", "value": 2},
   {"label": "Sunset", "value": 3},
-  {"label": "Sunrise", "value": 4}
+  {"label": "Sunrise", "value": 4},
+  {"label": "Step Count", "value": 5}
 ];
 
 module.exports = [

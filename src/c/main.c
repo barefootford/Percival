@@ -29,7 +29,8 @@ enum BottomCompType {
   BOTTOM_COMP_HIGHLOW = 1,
   BOTTOM_COMP_WEATHER = 2,
   BOTTOM_COMP_SUNSET = 3,
-  BOTTOM_COMP_SUNRISE = 4
+  BOTTOM_COMP_SUNRISE = 4,
+  BOTTOM_COMP_STEPS = 5
 };
 
 static Window *s_main_window;
@@ -40,6 +41,7 @@ static Layer *s_top_bar_layer;
 static Layer *s_window_layer;
 
 static GBitmap *s_brand_bitmap;
+static GBitmap *s_sneaker_bitmap;
 static Layer *s_bt_layer;
 static bool s_bt_connected;
 
@@ -479,6 +481,24 @@ static void draw_comp_sun(GContext *ctx, int cx, int cy, int radius,
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
+static void draw_comp_steps(GContext *ctx, int cx, int cy, int radius, GColor fg) {
+  GSize bmp_size = gbitmap_get_bounds(s_sneaker_bitmap).size;
+  int icon_x = cx - bmp_size.w / 2;
+  int icon_y = cy - bmp_size.h;
+
+  #ifdef PBL_COLOR
+    GColor palette[] = {fg, GColorClear};
+    gbitmap_set_palette(s_sneaker_bitmap, palette, false);
+  #endif
+  graphics_context_set_compositing_mode(ctx, GCompOpSet);
+  graphics_draw_bitmap_in_rect(ctx, s_sneaker_bitmap, GRect(icon_x, icon_y, bmp_size.w, bmp_size.h));
+
+  graphics_context_set_text_color(ctx, fg);
+  GRect text_rect = GRect(cx - radius, cy, radius * 2, 24);
+  graphics_draw_text(ctx, s_steps_buffer, s_font_18, text_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
 static void draw_bottom_comp(GContext *ctx, uint8_t type, int cx, int cy, int radius, bool is_primary) {
   if (type == BOTTOM_COMP_NONE) return;
 
@@ -513,6 +533,9 @@ static void draw_bottom_comp(GContext *ctx, uint8_t type, int cx, int cy, int ra
       draw_comp_sun(ctx, cx, cy, radius, fg, bg, rise, false);
       break;
     }
+    case BOTTOM_COMP_STEPS:
+      draw_comp_steps(ctx, cx, cy, radius, fg);
+      break;
   }
 }
 
@@ -568,6 +591,7 @@ static void main_window_load(Window *window) {
 
   // Load resources
   s_brand_bitmap = gbitmap_create_with_resource(RESOURCE_ID_PEBBLE_LOGO);
+  s_sneaker_bitmap = gbitmap_create_with_resource(RESOURCE_ID_SNEAKER_ICON);
   s_font_14 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_14));
   s_font_18 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_18));
   s_font_28 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_28));
@@ -620,6 +644,7 @@ static void main_window_unload(Window *window) {
   layer_destroy(s_top_bar_layer);
   layer_destroy(s_bt_layer);
   gbitmap_destroy(s_brand_bitmap);
+  gbitmap_destroy(s_sneaker_bitmap);
   fonts_unload_custom_font(s_font_14);
   fonts_unload_custom_font(s_font_18);
   fonts_unload_custom_font(s_font_28);

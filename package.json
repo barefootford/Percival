@@ -50,6 +50,11 @@
           "file": "images/pebble_logo.png"
         },
         {
+          "type": "png",
+          "name": "SNEAKER_ICON",
+          "file": "images/sneaker.png"
+        },
+        {
           "type": "font",
           "name": "FONT_INTER_SEMIBOLD_14",
           "file": "fonts/Inter-SemiBold.ttf",
@@ -60,7 +65,7 @@
           "type": "font",
           "name": "FONT_INTER_SEMIBOLD_18",
           "file": "fonts/Inter-SemiBold.ttf",
-          "characterRegex": "[0-9:\\-]",
+          "characterRegex": "[0-9:\\-.k]",
           "compatibility": "2.7"
         },
 {
