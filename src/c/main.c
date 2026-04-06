@@ -67,7 +67,7 @@ typedef struct {
 
 static Settings s_settings;
 
-static bool prv_needs_steps() {
+static bool needs_steps() {
   return (s_settings.mini_comp_left == MINI_COMP_STEPS ||
           s_settings.mini_comp_middle == MINI_COMP_STEPS ||
           s_settings.mini_comp_right == MINI_COMP_STEPS ||
@@ -76,7 +76,7 @@ static bool prv_needs_steps() {
           s_settings.bottom_comp_right == BOTTOM_COMP_STEPS);
 }
 
-static void prv_default_settings() {
+static void default_settings() {
   s_settings.primary_color = GColorBlack;
   s_settings.mini_comp_left = MINI_COMP_DATE;
   s_settings.mini_comp_middle = MINI_COMP_STEPS;
@@ -86,12 +86,12 @@ static void prv_default_settings() {
   s_settings.bottom_comp_right = BOTTOM_COMP_SUNSET;
 }
 
-static void prv_load_settings() {
-  prv_default_settings();
+static void load_settings() {
+  default_settings();
   persist_read_data(SETTINGS_KEY, &s_settings, sizeof(s_settings));
 }
 
-static void prv_save_settings() {
+static void save_settings() {
   persist_write_data(SETTINGS_KEY, &s_settings, sizeof(s_settings));
 }
 
@@ -107,14 +107,14 @@ typedef struct {
 
 static WeatherCache s_weather;
 
-static void prv_load_weather() {
+static void load_weather() {
   memset(&s_weather, 0, sizeof(s_weather));
   if (persist_exists(WEATHER_KEY)) {
     persist_read_data(WEATHER_KEY, &s_weather, sizeof(s_weather));
   }
 }
 
-static void prv_save_weather() {
+static void save_weather() {
   persist_write_data(WEATHER_KEY, &s_weather, sizeof(s_weather));
 }
 
@@ -127,9 +127,9 @@ static char s_sunset_mini_buffer[12];
 static char s_sunrise_mini_buffer[12];
 
 static void update_status_buffer(struct tm *t);
-static void prv_update_display();
+static void update_display();
 
-static void prv_format_time_buffer(const char *src, char *dest, size_t size, const char *suffix) {
+static void format_time_buffer(const char *src, char *dest, size_t size, const char *suffix) {
   if (s_weather.loaded && src[0]) {
     snprintf(dest, size, "%s%s", src, suffix);
   } else {
@@ -137,12 +137,12 @@ static void prv_format_time_buffer(const char *src, char *dest, size_t size, con
   }
 }
 
-static void prv_update_mini_weather_buffers() {
-  prv_format_time_buffer(s_weather.sunset, s_sunset_mini_buffer, sizeof(s_sunset_mini_buffer), "p");
-  prv_format_time_buffer(s_weather.sunrise, s_sunrise_mini_buffer, sizeof(s_sunrise_mini_buffer), "a");
+static void update_mini_weather_buffers() {
+  format_time_buffer(s_weather.sunset, s_sunset_mini_buffer, sizeof(s_sunset_mini_buffer), "p");
+  format_time_buffer(s_weather.sunrise, s_sunrise_mini_buffer, sizeof(s_sunrise_mini_buffer), "a");
 }
 
-static uint8_t prv_tuple_to_uint8(Tuple *t) {
+static uint8_t tuple_to_uint8(Tuple *t) {
   return t->type == TUPLE_CSTRING ? (uint8_t)atoi(t->value->cstring) : (uint8_t)t->value->int32;
 }
 
@@ -180,8 +180,8 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
 
   if (temp_tuple || high_tuple || low_tuple || city_tuple || sunset_tuple || sunrise_tuple) {
     s_weather.loaded = true;
-    prv_save_weather();
-    prv_update_mini_weather_buffers();
+    save_weather();
+    update_mini_weather_buffers();
     if (s_complications_layer) {
       layer_mark_dirty(s_complications_layer);
     }
@@ -205,32 +205,32 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     settings_changed = true;
   }
   if (left_t) {
-    s_settings.mini_comp_left = prv_tuple_to_uint8(left_t);
+    s_settings.mini_comp_left = tuple_to_uint8(left_t);
     settings_changed = true;
   }
   if (mid_t) {
-    s_settings.mini_comp_middle = prv_tuple_to_uint8(mid_t);
+    s_settings.mini_comp_middle = tuple_to_uint8(mid_t);
     settings_changed = true;
   }
   if (right_t) {
-    s_settings.mini_comp_right = prv_tuple_to_uint8(right_t);
+    s_settings.mini_comp_right = tuple_to_uint8(right_t);
     settings_changed = true;
   }
   if (bleft_t) {
-    s_settings.bottom_comp_left = prv_tuple_to_uint8(bleft_t);
+    s_settings.bottom_comp_left = tuple_to_uint8(bleft_t);
     settings_changed = true;
   }
   if (bpri_t) {
-    s_settings.bottom_comp_primary = prv_tuple_to_uint8(bpri_t);
+    s_settings.bottom_comp_primary = tuple_to_uint8(bpri_t);
     settings_changed = true;
   }
   if (bright_t) {
-    s_settings.bottom_comp_right = prv_tuple_to_uint8(bright_t);
+    s_settings.bottom_comp_right = tuple_to_uint8(bright_t);
     settings_changed = true;
   }
   if (settings_changed) {
-    prv_save_settings();
-    prv_update_display();
+    save_settings();
+    update_display();
   }
 }
 
@@ -246,14 +246,14 @@ static void outbox_sent_callback(DictionaryIterator *iterator, void *context) {
   APP_LOG(APP_LOG_LEVEL_INFO, "Outbox send success!");
 }
 
-static struct tm *prv_get_time(struct tm *t) {
+static struct tm *get_time(struct tm *t) {
   if (t) return t;
   time_t now = time(NULL);
   return localtime(&now);
 }
 
 static void update_time(struct tm *tick_time) {
-  struct tm *t = prv_get_time(tick_time);
+  struct tm *t = get_time(tick_time);
 
   static char s_time_buffer[8];
   strftime(s_time_buffer, sizeof(s_time_buffer), clock_is_24h_style() ?
@@ -279,14 +279,14 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
 }
 
 static void update_status_buffer(struct tm *tick_time) {
-  struct tm *t = prv_get_time(tick_time);
+  struct tm *t = get_time(tick_time);
   static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
   const char *day = days[t->tm_wday];
   snprintf(s_day_buffer, sizeof(s_day_buffer), "%s", day);
   snprintf(s_date_buffer, sizeof(s_date_buffer), "%s %d", day, t->tm_mday);
   snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%d%%", s_battery_level);
 
-  if (prv_needs_steps()) {
+  if (needs_steps()) {
     int steps = (int)health_service_sum_today(HealthMetricStepCount);
     if (steps >= 10000) {
       snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%dk", steps / 1000);
@@ -321,7 +321,7 @@ static void bt_update_proc(Layer *layer, GContext *ctx) {
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
-static void prv_update_display() {
+static void update_display() {
   if (s_time_layer) {
     text_layer_set_text_color(s_time_layer, s_settings.primary_color);
   }
@@ -570,7 +570,7 @@ static void complications_update_proc(Layer *layer, GContext *ctx) {
   draw_bottom_comp(ctx, s_settings.bottom_comp_right, cx3, y_center, circle_radius, false);
 }
 
-static void prv_update_layout() {
+static void update_layout() {
   GRect full = layer_get_bounds(s_window_layer);
   GRect unob = layer_get_unobstructed_bounds(s_window_layer);
   int obstructed = full.size.h - unob.size.h;
@@ -592,12 +592,12 @@ static void prv_update_layout() {
                   GRect(0, group_y + 76, full.size.w, 20));
 }
 
-static void prv_unobstructed_change(AnimationProgress progress, void *context) {
-  prv_update_layout();
+static void unobstructed_change(AnimationProgress progress, void *context) {
+  update_layout();
 }
 
-static void prv_unobstructed_did_change(void *context) {
-  prv_update_layout();
+static void unobstructed_did_change(void *context) {
+  update_layout();
 }
 
 static void main_window_load(Window *window) {
@@ -616,18 +616,18 @@ static void main_window_load(Window *window) {
   s_top_bar_layer = layer_create(GRect(0, 0, bounds.size.w, TOP_BAR_HEIGHT));
   layer_set_update_proc(s_top_bar_layer, top_bar_update_proc);
 
-  // Time layer (positioned by prv_update_layout)
+  // Time layer (positioned by update_layout)
   s_time_layer = text_layer_create(GRect(0, 0, bounds.size.w, 76));
   text_layer_set_background_color(s_time_layer, GColorClear);
   text_layer_set_text_color(s_time_layer, s_settings.primary_color);
   text_layer_set_font(s_time_layer, s_font_68);
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 
-  // Brand text (positioned by prv_update_layout)
+  // Brand text (positioned by update_layout)
   s_brand_layer = layer_create(GRect(0, 0, bounds.size.w, 20));
   layer_set_update_proc(s_brand_layer, brand_update_proc);
 
-  // Bluetooth disconnect indicator (positioned by prv_update_layout)
+  // Bluetooth disconnect indicator (positioned by update_layout)
   s_bt_layer = layer_create(GRect(0, 0, 50, 18));
   layer_set_update_proc(s_bt_layer, bt_update_proc);
   layer_set_hidden(s_bt_layer, true);
@@ -644,11 +644,11 @@ static void main_window_load(Window *window) {
   layer_add_child(s_window_layer, s_top_bar_layer);
 
   UnobstructedAreaHandlers ua_handlers = {
-    .change = prv_unobstructed_change,
-    .did_change = prv_unobstructed_did_change
+    .change = unobstructed_change,
+    .did_change = unobstructed_did_change
   };
   unobstructed_area_service_subscribe(ua_handlers, NULL);
-  prv_update_layout();
+  update_layout();
 }
 
 static void main_window_unload(Window *window) {
@@ -667,9 +667,9 @@ static void main_window_unload(Window *window) {
 }
 
 static void init() {
-  prv_load_settings();
-  prv_load_weather();
-  prv_update_mini_weather_buffers();
+  load_settings();
+  load_weather();
+  update_mini_weather_buffers();
   s_main_window = window_create();
   window_set_background_color(s_main_window, GColorWhite);
   window_set_window_handlers(s_main_window, (WindowHandlers) {
