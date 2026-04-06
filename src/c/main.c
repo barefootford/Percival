@@ -67,13 +67,30 @@ typedef struct {
 
 static Settings s_settings;
 
+static bool has_mini_comp(uint8_t type) {
+  return (s_settings.mini_comp_left == type ||
+          s_settings.mini_comp_middle == type ||
+          s_settings.mini_comp_right == type);
+}
+
+static bool has_bottom_comp(uint8_t type) {
+  return (s_settings.bottom_comp_left == type ||
+          s_settings.bottom_comp_primary == type ||
+          s_settings.bottom_comp_right == type);
+}
+
+static bool needs_weather() {
+  return (has_mini_comp(MINI_COMP_SUNSET) ||
+          has_mini_comp(MINI_COMP_SUNRISE) ||
+          has_bottom_comp(BOTTOM_COMP_HIGHLOW) ||
+          has_bottom_comp(BOTTOM_COMP_WEATHER) ||
+          has_bottom_comp(BOTTOM_COMP_SUNSET) ||
+          has_bottom_comp(BOTTOM_COMP_SUNRISE));
+}
+
 static bool needs_steps() {
-  return (s_settings.mini_comp_left == MINI_COMP_STEPS ||
-          s_settings.mini_comp_middle == MINI_COMP_STEPS ||
-          s_settings.mini_comp_right == MINI_COMP_STEPS ||
-          s_settings.bottom_comp_left == BOTTOM_COMP_STEPS ||
-          s_settings.bottom_comp_primary == BOTTOM_COMP_STEPS ||
-          s_settings.bottom_comp_right == BOTTOM_COMP_STEPS);
+  return (has_mini_comp(MINI_COMP_STEPS) ||
+          has_bottom_comp(BOTTOM_COMP_STEPS));
 }
 
 static void default_settings() {
@@ -267,8 +284,9 @@ static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time(tick_time);
   update_status_buffer(tick_time);
 
-  // Request weather update every 30 minutes (only if phone is connected)
+  // Request weather update every 30 minutes (only if needed and phone is connected)
   if (tick_time->tm_min % WEATHER_POLL_MINUTES == 0 &&
+      needs_weather() &&
       connection_service_peek_pebble_app_connection()) {
     DictionaryIterator *iter;
     if (app_message_outbox_begin(&iter) == APP_MSG_OK) {
