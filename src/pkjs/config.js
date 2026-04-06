@@ -39,6 +39,16 @@ module.exports = [
         "messageKey": "PrimaryColor",
         "label": "Primary Color",
         "defaultValue": "0x000000"
+      },
+      {
+        "type": "select",
+        "messageKey": "TempUnit",
+        "label": "Temperature Unit",
+        "defaultValue": 0,
+        "options": [
+          {"label": "Fahrenheit (°F)", "value": 0},
+          {"label": "Celsius (°C)", "value": 1}
+        ]
       }
     ]
   },

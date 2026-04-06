@@ -38,7 +38,8 @@
       "SUNRISE": 9,
       "BottomCompLeft": 10,
       "BottomCompPrimary": 11,
-      "BottomCompRight": 12
+      "BottomCompRight": 12,
+      "TempUnit": 13
     },
     "resources": {
       "media": [

@@ -63,15 +63,26 @@ function locationMoved(lat, lon) {
     Math.abs(lon - lastLon) > LOCATION_THRESHOLD;
 }
 
+function getTempUnit() {
+  try {
+    var settings = JSON.parse(localStorage.getItem('clay-settings'));
+    if (settings && settings.TempUnit) {
+      return parseInt(settings.TempUnit, 10) === 1 ? 'celsius' : 'fahrenheit';
+    }
+  } catch (e) {}
+  return 'fahrenheit';
+}
+
 function locationSuccess(pos) {
   var lat = pos.coords.latitude;
   var lon = pos.coords.longitude;
 
+  var unit = getTempUnit();
   var weatherUrl = 'https://api.open-meteo.com/v1/forecast?' +
     'latitude=' + lat + '&longitude=' + lon +
     '&current=temperature_2m' +
     '&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset' +
-    '&temperature_unit=fahrenheit' +
+    '&temperature_unit=' + unit +
     '&timezone=auto' +
     '&forecast_days=1';
 
