@@ -15,6 +15,8 @@ static Layer *s_top_bar_layer;
 static Layer *s_window_layer;
 
 static GBitmap *s_brand_bitmap;
+static Layer *s_bt_layer;
+static bool s_bt_connected;
 
 static GFont s_font_14;
 static GFont s_font_18;
@@ -183,6 +185,20 @@ static void update_status_buffer() {
 static void battery_callback(BatteryChargeState state) {
   s_battery_level = state.charge_percent;
   update_status_buffer();
+}
+
+static void bt_callback(bool connected) {
+  s_bt_connected = connected;
+  if (s_bt_layer) {
+    layer_set_hidden(s_bt_layer, connected);
+  }
+}
+
+static void bt_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
+  graphics_context_set_text_color(ctx, s_settings.primary_color);
+  graphics_draw_text(ctx, "NO BT", s_font_14, bounds,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
 static void prv_update_display() {
@@ -365,6 +381,8 @@ static void prv_update_layout() {
 
   layer_set_frame(text_layer_get_layer(s_time_layer),
                   GRect(0, group_y, full.size.w, 76));
+  layer_set_frame(s_bt_layer,
+                  GRect(full.size.w - 54, TOP_BAR_HEIGHT + 2, 50, 18));
   layer_set_frame(s_brand_layer,
                   GRect(0, group_y + 76, full.size.w, 20));
 }
@@ -403,6 +421,11 @@ static void main_window_load(Window *window) {
   s_brand_layer = layer_create(GRect(0, 0, bounds.size.w, 20));
   layer_set_update_proc(s_brand_layer, brand_update_proc);
 
+  // Bluetooth disconnect indicator (positioned by prv_update_layout)
+  s_bt_layer = layer_create(GRect(0, 0, 50, 18));
+  layer_set_update_proc(s_bt_layer, bt_update_proc);
+  layer_set_hidden(s_bt_layer, true);
+
   // Complications layer at the bottom
   int comp_height = 66;
   s_complications_layer = layer_create(GRect(0, bounds.size.h - comp_height - 4, bounds.size.w, comp_height));
@@ -410,6 +433,7 @@ static void main_window_load(Window *window) {
 
   layer_add_child(s_window_layer, s_brand_layer);
   layer_add_child(s_window_layer, text_layer_get_layer(s_time_layer));
+  layer_add_child(s_window_layer, s_bt_layer);
   layer_add_child(s_window_layer, s_complications_layer);
   layer_add_child(s_window_layer, s_top_bar_layer);
 
@@ -427,6 +451,7 @@ static void main_window_unload(Window *window) {
   text_layer_destroy(s_time_layer);
   layer_destroy(s_complications_layer);
   layer_destroy(s_top_bar_layer);
+  layer_destroy(s_bt_layer);
   gbitmap_destroy(s_brand_bitmap);
   fonts_unload_custom_font(s_font_14);
   fonts_unload_custom_font(s_font_18);
@@ -450,6 +475,11 @@ static void init() {
 
   battery_state_service_subscribe(battery_callback);
   battery_callback(battery_state_service_peek());
+
+  connection_service_subscribe((ConnectionHandlers) {
+    .pebble_app_connection_handler = bt_callback
+  });
+  bt_callback(connection_service_peek_pebble_app_connection());
 
   app_message_register_inbox_received(inbox_received_callback);
   app_message_register_inbox_dropped(inbox_dropped_callback);
