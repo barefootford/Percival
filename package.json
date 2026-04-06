@@ -1,6 +1,6 @@
 {
   "name": "percival",
-  "author": "MakeAwesomeHappen",
+  "author": "Andrew Ford",
   "version": "1.0.0",
   "keywords": [
     "pebble-app"
@@ -15,18 +15,16 @@
     "sdkVersion": "3",
     "enableMultiJS": true,
     "targetPlatforms": [
-      "aplite",
-      "basalt",
-      "chalk",
-      "diorite",
-      "emery",
-      "flint",
-      "gabbro"
+      "emery"
     ],
+    "projectType": "native",
     "watchapp": {
       "watchface": true
     },
-    "capabilities": ["configurable"],
+    "capabilities": [
+      "configurable",
+      "location"
+    ],
     "messageKeys": {
       "TEMPERATURE": 0,
       "TEMP_HIGH": 1,
@@ -51,6 +49,12 @@
         },
         {
           "type": "png",
+          "name": "MENU_ICON",
+          "file": "images/menu_icon.png",
+          "menuIcon": true
+        },
+        {
+          "type": "png",
           "name": "SNEAKER_ICON",
           "file": "images/sneaker.png"
         },
@@ -68,7 +72,7 @@
           "characterRegex": "[0-9:\\-.k]",
           "compatibility": "2.7"
         },
-{
+        {
           "type": "font",
           "name": "FONT_INTER_SEMIBOLD_28",
           "file": "fonts/Inter-SemiBold.ttf",
