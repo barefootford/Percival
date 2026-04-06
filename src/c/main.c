@@ -517,7 +517,7 @@ static void draw_comp_sun(GContext *ctx, int cx, int cy, int radius,
 static void draw_comp_steps(GContext *ctx, int cx, int cy, int radius, GColor fg) {
   GSize bmp_size = gbitmap_get_bounds(s_sneaker_bitmap).size;
   int icon_x = cx - bmp_size.w / 2;
-  int icon_y = cy - bmp_size.h;
+  int icon_y = cy + 4 - bmp_size.h;
 
   #ifdef PBL_COLOR
     GColor palette[] = {fg, GColorClear};
