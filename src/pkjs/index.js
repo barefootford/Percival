@@ -80,7 +80,10 @@ function locationSuccess(pos) {
   }
 
   xhrRequest(weatherUrl, 'GET', function (weatherResp) {
-    weatherData = JSON.parse(weatherResp);
+    try { weatherData = JSON.parse(weatherResp); } catch (e) {
+      console.log('Weather parse error: ' + e);
+      return;
+    }
     trySend();
   });
 
@@ -89,7 +92,10 @@ function locationSuccess(pos) {
       'latitude=' + lat + '&longitude=' + lon + '&localityLanguage=en';
 
     xhrRequest(geoUrl, 'GET', function (geoResp) {
-      var geo = JSON.parse(geoResp);
+      try { var geo = JSON.parse(geoResp); } catch (e) {
+        console.log('Geocode parse error: ' + e);
+        return;
+      }
       var city = geo.city || geo.locality || '?';
       cityInitials = getCityInitials(city);
       trySend();
