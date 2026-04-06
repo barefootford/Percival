@@ -139,8 +139,8 @@ static void save_weather() {
 static int s_battery_level;
 static char s_date_buffer[12];
 static char s_battery_buffer[8];
-static char s_steps_buffer[8];
-static char s_year_buffer[6];
+static char s_steps_buffer[12];
+static char s_year_buffer[12];
 static char s_month_buffer[5];
 static char s_sunset_mini_buffer[12];
 static char s_sunrise_mini_buffer[12];
