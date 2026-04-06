@@ -56,6 +56,9 @@ static GFont s_font_68;
 #define SETTINGS_KEY 1
 #define WEATHER_KEY 2
 
+// New fields must be appended to the end — never insert or reorder.
+// load_settings() reads stored bytes and zero-fills the rest, so
+// existing users keep their settings when the struct grows.
 typedef struct {
   GColor primary_color;
   uint8_t mini_comp_left;
@@ -106,7 +109,12 @@ static void default_settings() {
 
 static void load_settings() {
   default_settings();
-  persist_read_data(SETTINGS_KEY, &s_settings, sizeof(s_settings));
+  if (persist_exists(SETTINGS_KEY)) {
+    int stored = persist_get_size(SETTINGS_KEY);
+    if (stored > 0 && (size_t)stored <= sizeof(s_settings)) {
+      persist_read_data(SETTINGS_KEY, &s_settings, stored);
+    }
+  }
 }
 
 static void save_settings() {
@@ -128,7 +136,10 @@ static WeatherCache s_weather;
 static void load_weather() {
   memset(&s_weather, 0, sizeof(s_weather));
   if (persist_exists(WEATHER_KEY)) {
-    persist_read_data(WEATHER_KEY, &s_weather, sizeof(s_weather));
+    int stored = persist_get_size(WEATHER_KEY);
+    if (stored > 0 && (size_t)stored <= sizeof(s_weather)) {
+      persist_read_data(WEATHER_KEY, &s_weather, stored);
+    }
   }
 }
 
