@@ -113,6 +113,16 @@ module.exports = [
     ]
   },
   {
+    "type": "section",
+    "items": [
+      {
+        "type": "button",
+        "defaultValue": "Refresh Weather",
+        "id": "refresh-weather"
+      }
+    ]
+  },
+  {
     "type": "submit",
     "defaultValue": "Save"
   }

@@ -2,7 +2,11 @@ var WEATHER_POLL_MINUTES = 30;
 
 var Clay = require('@rebble/clay');
 var clayConfig = require('./config');
-var clay = new Clay(clayConfig);
+var clay = new Clay(clayConfig, function(minified) {
+  minified('#refresh-weather').on('click', function() {
+    minified('.submit').trigger('click');
+  });
+});
 
 var xhrRequest = function (url, type, callback) {
   var xhr = new XMLHttpRequest();
