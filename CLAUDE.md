@@ -2,6 +2,9 @@
 
 Pebble watchface built with Pebble SDK 3. Displays time, date, battery, and weather complications.
 
+Percival was published April 7, 2026 in the Pebble store:
+https://apps.repebble.com/2799cd581c2a4bbbade7f3da
+
 ## Build
 
 ```
