@@ -6,7 +6,8 @@ var miniCompOptions = [
   {"label": "Year", "value": 4},
   {"label": "Sunset", "value": 5},
   {"label": "Sunrise", "value": 6},
-  {"label": "Month", "value": 7}
+  {"label": "Month", "value": 7},
+  {"label": "UV Index", "value": 8}
 ];
 
 var bottomCompOptions = [

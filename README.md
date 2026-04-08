@@ -16,6 +16,6 @@
 A proud Pebble watchface with primary and accent complications.
 
 - **Primary Complications:** Current weather, daily high/low temps, sunrise time, sunset time, or step count.
-- **Accent Complications:** Date, steps, battery, sunrise, sunset, year, or month
+- **Accent Complications:** Date, steps, battery, sunrise, sunset, year, month, or UV index
 
 Color and complications are configurable through settings on the Pebble app.

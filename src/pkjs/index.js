@@ -80,7 +80,7 @@ function locationSuccess(pos) {
   var unit = getTempUnit();
   var weatherUrl = 'https://api.open-meteo.com/v1/forecast?' +
     'latitude=' + lat + '&longitude=' + lon +
-    '&current=temperature_2m' +
+    '&current=temperature_2m,uv_index' +
     '&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset' +
     '&temperature_unit=' + unit +
     '&timezone=auto' +
@@ -115,7 +115,8 @@ function locationSuccess(pos) {
       'TEMP_LOW': Math.round(weatherData.daily.temperature_2m_min[0]),
       'CITY': cityInitials,
       'SUNSET': set,
-      'SUNRISE': rise
+      'SUNRISE': rise,
+      'UV_INDEX': weatherData.current.uv_index != null ? Math.round(weatherData.current.uv_index) : -1
     },
       function (e) { console.log('Weather sent successfully'); },
       function (e) { console.log('Error sending weather: ' + JSON.stringify(e)); }

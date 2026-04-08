@@ -13,6 +13,7 @@ extern uint32_t MESSAGE_KEY_SUNRISE;
 extern uint32_t MESSAGE_KEY_BottomCompLeft;
 extern uint32_t MESSAGE_KEY_BottomCompPrimary;
 extern uint32_t MESSAGE_KEY_BottomCompRight;
+extern uint32_t MESSAGE_KEY_UV_INDEX;
 
 enum MiniCompType {
   MINI_COMP_NONE = 0,
@@ -22,7 +23,8 @@ enum MiniCompType {
   MINI_COMP_YEAR = 4,
   MINI_COMP_SUNSET = 5,
   MINI_COMP_SUNRISE = 6,
-  MINI_COMP_MONTH = 7
+  MINI_COMP_MONTH = 7,
+  MINI_COMP_UV = 8
 };
 
 enum BottomCompType {
@@ -86,6 +88,7 @@ static bool has_bottom_comp(uint8_t type) {
 static bool needs_weather() {
   return (has_mini_comp(MINI_COMP_SUNSET) ||
           has_mini_comp(MINI_COMP_SUNRISE) ||
+          has_mini_comp(MINI_COMP_UV) ||
           has_bottom_comp(BOTTOM_COMP_HIGHLOW) ||
           has_bottom_comp(BOTTOM_COMP_WEATHER) ||
           has_bottom_comp(BOTTOM_COMP_SUNSET) ||
@@ -128,6 +131,7 @@ typedef struct {
   char city[4];
   char sunset[8];
   char sunrise[8];
+  char uv[8];
   bool loaded;
 } WeatherCache;
 
@@ -155,6 +159,7 @@ static char s_year_buffer[12];
 static char s_month_buffer[5];
 static char s_sunset_mini_buffer[12];
 static char s_sunrise_mini_buffer[12];
+static char s_uv_buffer[8];
 
 static void update_status_buffer(struct tm *t);
 static void update_display();
@@ -170,6 +175,11 @@ static void format_time_buffer(const char *src, char *dest, size_t size, const c
 static void update_mini_weather_buffers() {
   format_time_buffer(s_weather.sunset, s_sunset_mini_buffer, sizeof(s_sunset_mini_buffer), "p");
   format_time_buffer(s_weather.sunrise, s_sunrise_mini_buffer, sizeof(s_sunrise_mini_buffer), "a");
+  if (s_weather.loaded && s_weather.uv[0]) {
+    snprintf(s_uv_buffer, sizeof(s_uv_buffer), "UV %s", s_weather.uv);
+  } else {
+    snprintf(s_uv_buffer, sizeof(s_uv_buffer), "UV -");
+  }
 }
 
 static uint8_t tuple_to_uint8(Tuple *t) {
@@ -208,7 +218,17 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     snprintf(s_weather.sunrise, sizeof(s_weather.sunrise), "%s", sunrise_tuple->value->cstring);
   }
 
-  if (temp_tuple || high_tuple || low_tuple || city_tuple || sunset_tuple || sunrise_tuple) {
+  Tuple *uv_tuple = dict_find(iterator, MESSAGE_KEY_UV_INDEX);
+  if (uv_tuple) {
+    int uv_val = (int)uv_tuple->value->int32;
+    if (uv_val >= 0) {
+      snprintf(s_weather.uv, sizeof(s_weather.uv), "%d", uv_val);
+    } else {
+      s_weather.uv[0] = '\0';
+    }
+  }
+
+  if (temp_tuple || high_tuple || low_tuple || city_tuple || sunset_tuple || sunrise_tuple || uv_tuple) {
     s_weather.loaded = true;
     save_weather();
     update_mini_weather_buffers();
@@ -395,6 +415,7 @@ static const char* get_mini_comp_text(uint8_t type) {
     case MINI_COMP_SUNSET: return s_sunset_mini_buffer;
     case MINI_COMP_SUNRISE: return s_sunrise_mini_buffer;
     case MINI_COMP_MONTH: return s_month_buffer;
+    case MINI_COMP_UV: return s_uv_buffer;
     default: return NULL;
   }
 }
@@ -718,6 +739,7 @@ static void init() {
   window_stack_push(s_main_window, true);
 
   update_time(NULL);
+  update_status_buffer(NULL);
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
 
   battery_state_service_subscribe(battery_callback);

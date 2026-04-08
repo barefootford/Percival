@@ -1,7 +1,7 @@
 {
   "name": "percival",
   "author": "Andrew Ford",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "keywords": [
     "pebble-app"
   ],
@@ -39,7 +39,8 @@
       "BottomCompLeft": 10,
       "BottomCompPrimary": 11,
       "BottomCompRight": 12,
-      "TempUnit": 13
+      "TempUnit": 13,
+      "UV_INDEX": 14
     },
     "resources": {
       "media": [
