@@ -24,7 +24,8 @@ enum MiniCompType {
   MINI_COMP_SUNSET = 5,
   MINI_COMP_SUNRISE = 6,
   MINI_COMP_MONTH = 7,
-  MINI_COMP_UV = 8
+  MINI_COMP_UV = 8,
+  MINI_COMP_WEEK = 9
 };
 
 enum BottomCompType {
@@ -33,7 +34,9 @@ enum BottomCompType {
   BOTTOM_COMP_WEATHER = 2,
   BOTTOM_COMP_SUNSET = 3,
   BOTTOM_COMP_SUNRISE = 4,
-  BOTTOM_COMP_STEPS = 5
+  BOTTOM_COMP_STEPS = 5,
+  BOTTOM_COMP_WEEK = 6,
+  BOTTOM_COMP_UV = 7
 };
 
 static Window *s_main_window;
@@ -92,7 +95,8 @@ static bool needs_weather() {
           has_bottom_comp(BOTTOM_COMP_HIGHLOW) ||
           has_bottom_comp(BOTTOM_COMP_WEATHER) ||
           has_bottom_comp(BOTTOM_COMP_SUNSET) ||
-          has_bottom_comp(BOTTOM_COMP_SUNRISE));
+          has_bottom_comp(BOTTOM_COMP_SUNRISE) ||
+          has_bottom_comp(BOTTOM_COMP_UV));
 }
 
 static bool needs_steps() {
@@ -160,6 +164,7 @@ static char s_month_buffer[5];
 static char s_sunset_mini_buffer[12];
 static char s_sunrise_mini_buffer[12];
 static char s_uv_buffer[8];
+static char s_week_buffer[8];
 
 static void update_status_buffer(struct tm *t);
 static void update_display();
@@ -337,6 +342,7 @@ static void update_status_buffer(struct tm *tick_time) {
                                    "July", "Aug", "Sep", "Oct", "Nov", "Dec"};
   snprintf(s_year_buffer, sizeof(s_year_buffer), "%d", t->tm_year + 1900);
   snprintf(s_month_buffer, sizeof(s_month_buffer), "%s", months[t->tm_mon]);
+  strftime(s_week_buffer, sizeof(s_week_buffer), "W%V", t);
   snprintf(s_date_buffer, sizeof(s_date_buffer), "%s %d", day, t->tm_mday);
   snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%d%%", s_battery_level);
 
@@ -416,6 +422,7 @@ static const char* get_mini_comp_text(uint8_t type) {
     case MINI_COMP_SUNRISE: return s_sunrise_mini_buffer;
     case MINI_COMP_MONTH: return s_month_buffer;
     case MINI_COMP_UV: return s_uv_buffer;
+    case MINI_COMP_WEEK: return s_week_buffer;
     default: return NULL;
   }
 }
@@ -511,6 +518,28 @@ static void draw_comp_weather(GContext *ctx, int cx, int cy, int radius, GColor 
     graphics_context_set_stroke_width(ctx, 1);
     graphics_draw_circle(ctx, GPoint(cx + ts.w / 2 + 3, temp_rect.origin.y + 7), 2);
   }
+}
+
+static void draw_comp_week(GContext *ctx, int cx, int cy, int radius, GColor fg) {
+  graphics_context_set_text_color(ctx, fg);
+  GRect label_rect = GRect(cx - radius, cy - radius + 7, radius * 2, 18);
+  graphics_draw_text(ctx, "WK", s_font_14, label_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  GRect num_rect = GRect(cx - radius, cy - 8, radius * 2, 34);
+  graphics_draw_text(ctx, &s_week_buffer[1], s_font_28, num_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
+static void draw_comp_uv(GContext *ctx, int cx, int cy, int radius, GColor fg) {
+  const char *uv_num = (s_weather.loaded && s_weather.uv[0]) ? s_weather.uv : "-";
+
+  graphics_context_set_text_color(ctx, fg);
+  GRect label_rect = GRect(cx - radius, cy - radius + 7, radius * 2, 18);
+  graphics_draw_text(ctx, "UV", s_font_14, label_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  GRect num_rect = GRect(cx - radius, cy - 8, radius * 2, 34);
+  graphics_draw_text(ctx, uv_num, s_font_28, num_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
 static void draw_comp_sun(GContext *ctx, int cx, int cy, int radius,
@@ -610,6 +639,12 @@ static void draw_bottom_comp(GContext *ctx, uint8_t type, int cx, int cy, int ra
     }
     case BOTTOM_COMP_STEPS:
       draw_comp_steps(ctx, cx, cy, radius, fg);
+      break;
+    case BOTTOM_COMP_WEEK:
+      draw_comp_week(ctx, cx, cy, radius, fg);
+      break;
+    case BOTTOM_COMP_UV:
+      draw_comp_uv(ctx, cx, cy, radius, fg);
       break;
   }
 }
