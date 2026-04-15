@@ -21,6 +21,28 @@ var lastLat = null;
 var lastLon = null;
 var LOCATION_THRESHOLD = 0.01; // ~1km movement before re-fetching city
 
+// Cache of the last payload successfully delivered to the watch. Avoids
+// redundant AppMessage sends (and the BT radio wake-up) when nothing has
+// changed between polls. Persisted so it survives PKJS restarts.
+var LAST_SENT_KEY = 'percival-last-weather-sent';
+var lastSent = null;
+try {
+  var stored = localStorage.getItem(LAST_SENT_KEY);
+  if (stored) lastSent = JSON.parse(stored);
+} catch (e) { /* corrupt cache — ignore and re-send */ }
+
+function weatherPayloadsEqual(a, b) {
+  if (!a || !b) return false;
+  return a.TEMPERATURE === b.TEMPERATURE &&
+    a.TEMP_HIGH === b.TEMP_HIGH &&
+    a.TEMP_LOW === b.TEMP_LOW &&
+    a.CITY === b.CITY &&
+    a.SUNSET === b.SUNSET &&
+    a.SUNRISE === b.SUNRISE &&
+    a.UV_INDEX === b.UV_INDEX &&
+    a._unit === b._unit;
+}
+
 var CITY_ABBREVIATIONS = {
   // Multi-word cities where initials are ambiguous or wrong
   'coeur dalene': 'CDA',   // API returns "Coeur d'Alene"
@@ -109,7 +131,7 @@ function locationSuccess(pos) {
     lastLon = lon;
     cachedCity = cityInitials;
 
-    Pebble.sendAppMessage({
+    var payload = {
       'TEMPERATURE': Math.round(weatherData.current.temperature_2m),
       'TEMP_HIGH': Math.round(weatherData.daily.temperature_2m_max[0]),
       'TEMP_LOW': Math.round(weatherData.daily.temperature_2m_min[0]),
@@ -117,8 +139,26 @@ function locationSuccess(pos) {
       'SUNSET': set,
       'SUNRISE': rise,
       'UV_INDEX': weatherData.current.uv_index != null ? Math.round(weatherData.current.uv_index) : -1
-    },
-      function (e) { console.log('Weather sent successfully'); },
+    };
+    // Include unit in the comparison so a °F↔°C toggle always forces a resend,
+    // even if the rounded numbers happen to coincide. _unit is stripped before
+    // sending so the watch never sees it.
+    var snapshot = {};
+    for (var k in payload) snapshot[k] = payload[k];
+    snapshot._unit = unit;
+
+    if (weatherPayloadsEqual(snapshot, lastSent)) {
+      console.log('Weather unchanged since last send; skipping AppMessage');
+      return;
+    }
+
+    Pebble.sendAppMessage(payload,
+      function (e) {
+        console.log('Weather sent successfully');
+        lastSent = snapshot;
+        try { localStorage.setItem(LAST_SENT_KEY, JSON.stringify(snapshot)); }
+        catch (e2) { /* storage full — cache stays in memory only */ }
+      },
       function (e) { console.log('Error sending weather: ' + JSON.stringify(e)); }
     );
   }
