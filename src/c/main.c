@@ -14,6 +14,7 @@ extern uint32_t MESSAGE_KEY_BottomCompLeft;
 extern uint32_t MESSAGE_KEY_BottomCompPrimary;
 extern uint32_t MESSAGE_KEY_BottomCompRight;
 extern uint32_t MESSAGE_KEY_UV_INDEX;
+extern uint32_t MESSAGE_KEY_AIR_QUALITY;
 
 enum MiniCompType {
   MINI_COMP_NONE = 0,
@@ -25,7 +26,8 @@ enum MiniCompType {
   MINI_COMP_SUNRISE = 6,
   MINI_COMP_MONTH = 7,
   MINI_COMP_UV = 8,
-  MINI_COMP_WEEK = 9
+  MINI_COMP_WEEK = 9,
+  MINI_COMP_AQ = 10
 };
 
 enum BottomCompType {
@@ -36,7 +38,8 @@ enum BottomCompType {
   BOTTOM_COMP_SUNRISE = 4,
   BOTTOM_COMP_STEPS = 5,
   BOTTOM_COMP_WEEK = 6,
-  BOTTOM_COMP_UV = 7
+  BOTTOM_COMP_UV = 7,
+  BOTTOM_COMP_AQ = 8
 };
 
 static Window *s_main_window;
@@ -92,11 +95,13 @@ static bool needs_weather() {
   return (has_mini_comp(MINI_COMP_SUNSET) ||
           has_mini_comp(MINI_COMP_SUNRISE) ||
           has_mini_comp(MINI_COMP_UV) ||
+          has_mini_comp(MINI_COMP_AQ) ||
           has_bottom_comp(BOTTOM_COMP_HIGHLOW) ||
           has_bottom_comp(BOTTOM_COMP_WEATHER) ||
           has_bottom_comp(BOTTOM_COMP_SUNSET) ||
           has_bottom_comp(BOTTOM_COMP_SUNRISE) ||
-          has_bottom_comp(BOTTOM_COMP_UV));
+          has_bottom_comp(BOTTOM_COMP_UV) ||
+          has_bottom_comp(BOTTOM_COMP_AQ));
 }
 
 static bool needs_steps() {
@@ -128,6 +133,9 @@ static void save_settings() {
   persist_write_data(SETTINGS_KEY, &s_settings, sizeof(s_settings));
 }
 
+// New fields must be appended to the end so older persisted caches
+// still load correctly (load_weather zero-fills anything beyond the
+// stored size).
 typedef struct {
   char temp[8];
   char high[8];
@@ -137,6 +145,7 @@ typedef struct {
   char sunrise[8];
   char uv[8];
   bool loaded;
+  char aq[8];
 } WeatherCache;
 
 static WeatherCache s_weather;
@@ -165,6 +174,7 @@ static char s_sunset_mini_buffer[12];
 static char s_sunrise_mini_buffer[12];
 static char s_uv_buffer[8];
 static char s_week_buffer[8];
+static char s_aq_buffer[12];
 
 static void update_status_buffer(struct tm *t);
 static void update_display();
@@ -184,6 +194,11 @@ static void update_mini_weather_buffers() {
     snprintf(s_uv_buffer, sizeof(s_uv_buffer), "UV %s", s_weather.uv);
   } else {
     snprintf(s_uv_buffer, sizeof(s_uv_buffer), "UV -");
+  }
+  if (s_weather.loaded && s_weather.aq[0]) {
+    snprintf(s_aq_buffer, sizeof(s_aq_buffer), "AQ %s", s_weather.aq);
+  } else {
+    snprintf(s_aq_buffer, sizeof(s_aq_buffer), "AQ -");
   }
 }
 
@@ -233,7 +248,17 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     }
   }
 
-  if (temp_tuple || high_tuple || low_tuple || city_tuple || sunset_tuple || sunrise_tuple || uv_tuple) {
+  Tuple *aq_tuple = dict_find(iterator, MESSAGE_KEY_AIR_QUALITY);
+  if (aq_tuple) {
+    int aq_val = (int)aq_tuple->value->int32;
+    if (aq_val >= 0) {
+      snprintf(s_weather.aq, sizeof(s_weather.aq), "%d", aq_val);
+    } else {
+      s_weather.aq[0] = '\0';
+    }
+  }
+
+  if (temp_tuple || high_tuple || low_tuple || city_tuple || sunset_tuple || sunrise_tuple || uv_tuple || aq_tuple) {
     s_weather.loaded = true;
     save_weather();
     update_mini_weather_buffers();
@@ -423,6 +448,7 @@ static const char* get_mini_comp_text(uint8_t type) {
     case MINI_COMP_MONTH: return s_month_buffer;
     case MINI_COMP_UV: return s_uv_buffer;
     case MINI_COMP_WEEK: return s_week_buffer;
+    case MINI_COMP_AQ: return s_aq_buffer;
     default: return NULL;
   }
 }
@@ -542,6 +568,18 @@ static void draw_comp_uv(GContext *ctx, int cx, int cy, int radius, GColor fg) {
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
+static void draw_comp_aq(GContext *ctx, int cx, int cy, int radius, GColor fg) {
+  const char *aq_num = (s_weather.loaded && s_weather.aq[0]) ? s_weather.aq : "-";
+
+  graphics_context_set_text_color(ctx, fg);
+  GRect label_rect = GRect(cx - radius, cy - radius + 7, radius * 2, 18);
+  graphics_draw_text(ctx, "AQ", s_font_14, label_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  GRect num_rect = GRect(cx - radius, cy - 8, radius * 2, 34);
+  graphics_draw_text(ctx, aq_num, s_font_28, num_rect,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+}
+
 static void draw_comp_sun(GContext *ctx, int cx, int cy, int radius,
                           GColor fg, GColor bg, const char *time_str, bool fill_sun) {
   int sun_r = 12;
@@ -645,6 +683,9 @@ static void draw_bottom_comp(GContext *ctx, uint8_t type, int cx, int cy, int ra
       break;
     case BOTTOM_COMP_UV:
       draw_comp_uv(ctx, cx, cy, radius, fg);
+      break;
+    case BOTTOM_COMP_AQ:
+      draw_comp_aq(ctx, cx, cy, radius, fg);
       break;
   }
 }

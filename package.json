@@ -40,7 +40,8 @@
       "BottomCompPrimary": 11,
       "BottomCompRight": 12,
       "TempUnit": 13,
-      "UV_INDEX": 14
+      "UV_INDEX": 14,
+      "AIR_QUALITY": 15
     },
     "resources": {
       "media": [

@@ -86,10 +86,15 @@ function locationSuccess(pos) {
     '&timezone=auto' +
     '&forecast_days=1';
 
+  var aqUrl = 'https://air-quality-api.open-meteo.com/v1/air-quality?' +
+    'latitude=' + lat + '&longitude=' + lon +
+    '&current=us_aqi';
+
   var needGeo = locationMoved(lat, lon);
   var weatherData = null;
+  var aqData = null;
   var cityInitials = cachedCity || '';
-  var pending = needGeo ? 2 : 1;
+  var pending = needGeo ? 3 : 2;
 
   function trySend() {
     pending--;
@@ -109,6 +114,11 @@ function locationSuccess(pos) {
     lastLon = lon;
     cachedCity = cityInitials;
 
+    var aqi = -1;
+    if (aqData && aqData.current && aqData.current.us_aqi != null) {
+      aqi = Math.round(aqData.current.us_aqi);
+    }
+
     Pebble.sendAppMessage({
       'TEMPERATURE': Math.round(weatherData.current.temperature_2m),
       'TEMP_HIGH': Math.round(weatherData.daily.temperature_2m_max[0]),
@@ -116,7 +126,8 @@ function locationSuccess(pos) {
       'CITY': cityInitials,
       'SUNSET': set,
       'SUNRISE': rise,
-      'UV_INDEX': weatherData.current.uv_index != null ? Math.round(weatherData.current.uv_index) : -1
+      'UV_INDEX': weatherData.current.uv_index != null ? Math.round(weatherData.current.uv_index) : -1,
+      'AIR_QUALITY': aqi
     },
       function (e) { console.log('Weather sent successfully'); },
       function (e) { console.log('Error sending weather: ' + JSON.stringify(e)); }
@@ -131,6 +142,20 @@ function locationSuccess(pos) {
     }
     try { weatherData = JSON.parse(weatherResp); } catch (e) {
       console.log('Weather parse error: ' + e);
+      trySend();
+      return;
+    }
+    trySend();
+  });
+
+  xhrRequest(aqUrl, 'GET', function (aqResp) {
+    if (!aqResp) {
+      console.log('Air quality request failed');
+      trySend();
+      return;
+    }
+    try { aqData = JSON.parse(aqResp); } catch (e) {
+      console.log('Air quality parse error: ' + e);
       trySend();
       return;
     }

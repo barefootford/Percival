@@ -8,7 +8,8 @@ var miniCompOptions = [
   {"label": "Sunrise", "value": 6},
   {"label": "Month", "value": 7},
   {"label": "UV Index", "value": 8},
-  {"label": "Week Number", "value": 9}
+  {"label": "Week Number", "value": 9},
+  {"label": "Air Quality", "value": 10}
 ];
 
 var bottomCompOptions = [
@@ -19,7 +20,8 @@ var bottomCompOptions = [
   {"label": "Sunrise", "value": 4},
   {"label": "Step Count", "value": 5},
   {"label": "Week Number", "value": 6},
-  {"label": "UV Index", "value": 7}
+  {"label": "UV Index", "value": 7},
+  {"label": "Air Quality", "value": 8}
 ];
 
 var bottomCompPrimaryOptions = [
@@ -29,7 +31,8 @@ var bottomCompPrimaryOptions = [
   {"label": "Sunrise", "value": 4},
   {"label": "Step Count", "value": 5},
   {"label": "Week Number", "value": 6},
-  {"label": "UV Index", "value": 7}
+  {"label": "UV Index", "value": 7},
+  {"label": "Air Quality", "value": 8}
 ];
 
 module.exports = [
