@@ -14,6 +14,7 @@ extern uint32_t MESSAGE_KEY_BottomCompLeft;
 extern uint32_t MESSAGE_KEY_BottomCompPrimary;
 extern uint32_t MESSAGE_KEY_BottomCompRight;
 extern uint32_t MESSAGE_KEY_UV_INDEX;
+extern uint32_t MESSAGE_KEY_Canvas;
 
 enum MiniCompType {
   MINI_COMP_NONE = 0,
@@ -26,6 +27,11 @@ enum MiniCompType {
   MINI_COMP_MONTH = 7,
   MINI_COMP_UV = 8,
   MINI_COMP_WEEK = 9
+};
+
+enum Canvas {
+  CANVAS_PAPER = 0,
+  CANVAS_INK = 1
 };
 
 enum BottomCompType {
@@ -56,7 +62,7 @@ static GFont s_font_18;
 static GFont s_font_28;
 static GFont s_font_68;
 
-#define TOP_BAR_HEIGHT 20
+#define TOP_BAR_HEIGHT 22
 #define WEATHER_POLL_MINUTES 30
 #define SETTINGS_KEY 1
 #define WEATHER_KEY 2
@@ -72,9 +78,18 @@ typedef struct {
   uint8_t bottom_comp_left;
   uint8_t bottom_comp_primary;
   uint8_t bottom_comp_right;
+  uint8_t canvas;
 } Settings;
 
 static Settings s_settings;
+
+static GColor fg_color() {
+  return s_settings.canvas == CANVAS_INK ? GColorWhite : s_settings.primary_color;
+}
+
+static GColor bg_color() {
+  return s_settings.canvas == CANVAS_INK ? s_settings.primary_color : GColorWhite;
+}
 
 static bool has_mini_comp(uint8_t type) {
   return (s_settings.mini_comp_left == type ||
@@ -112,6 +127,7 @@ static void default_settings() {
   s_settings.bottom_comp_left = BOTTOM_COMP_HIGHLOW;
   s_settings.bottom_comp_primary = BOTTOM_COMP_WEATHER;
   s_settings.bottom_comp_right = BOTTOM_COMP_SUNSET;
+  s_settings.canvas = CANVAS_PAPER;
 }
 
 static void load_settings() {
@@ -253,6 +269,7 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   Tuple *bleft_t = dict_find(iterator, MESSAGE_KEY_BottomCompLeft);
   Tuple *bpri_t = dict_find(iterator, MESSAGE_KEY_BottomCompPrimary);
   Tuple *bright_t = dict_find(iterator, MESSAGE_KEY_BottomCompRight);
+  Tuple *canvas_t = dict_find(iterator, MESSAGE_KEY_Canvas);
 
   bool settings_changed = false;
   if (color_t) {
@@ -283,8 +300,13 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     s_settings.bottom_comp_right = tuple_to_uint8(bright_t);
     settings_changed = true;
   }
+  if (canvas_t) {
+    s_settings.canvas = tuple_to_uint8(canvas_t);
+    settings_changed = true;
+  }
   if (settings_changed) {
     save_settings();
+    window_set_background_color(s_main_window, bg_color());
     update_display();
   }
 }
@@ -376,14 +398,14 @@ static void bt_callback(bool connected) {
 
 static void bt_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  graphics_context_set_text_color(ctx, s_settings.primary_color);
+  graphics_context_set_text_color(ctx, fg_color());
   graphics_draw_text(ctx, "NO BT", s_font_14, bounds,
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
 static void update_display() {
   if (s_time_layer) {
-    text_layer_set_text_color(s_time_layer, s_settings.primary_color);
+    text_layer_set_text_color(s_time_layer, fg_color());
   }
   if (s_brand_layer) {
     layer_mark_dirty(s_brand_layer);
@@ -404,7 +426,7 @@ static void brand_update_proc(Layer *layer, GContext *ctx) {
 
   #ifdef PBL_COLOR
     static GColor palette[2];
-    palette[0] = s_settings.primary_color;
+    palette[0] = fg_color();
     palette[1] = GColorClear;
     gbitmap_set_palette(s_brand_bitmap, palette, false);
   #endif
@@ -429,15 +451,19 @@ static const char* get_mini_comp_text(uint8_t type) {
 
 static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
+  bool ink = s_settings.canvas == CANVAS_INK;
 
-  graphics_context_set_fill_color(ctx, s_settings.primary_color);
-  graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  if (!ink) {
+    graphics_context_set_fill_color(ctx, s_settings.primary_color);
+    graphics_fill_rect(ctx, bounds, 0, GCornerNone);
+  }
 
   const char *left = get_mini_comp_text(s_settings.mini_comp_left);
   const char *mid = get_mini_comp_text(s_settings.mini_comp_middle);
   const char *right = get_mini_comp_text(s_settings.mini_comp_right);
 
-  graphics_context_set_text_color(ctx, GColorWhite);
+  GColor content_color = ink ? fg_color() : GColorWhite;
+  graphics_context_set_text_color(ctx, content_color);
   int pad = 4;
   GRect text_rect = GRect(pad, 2, bounds.size.w - pad * 2, bounds.size.h);
 
@@ -458,7 +484,7 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   int center_x = bounds.size.w / 2;
   int dot_y = bounds.size.h / 2;
   int dot_r = 2;
-  graphics_context_set_fill_color(ctx, GColorWhite);
+  graphics_context_set_fill_color(ctx, content_color);
 
   GSize left_size = left ? graphics_text_layout_get_content_size(
       left, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft) : GSizeZero;
@@ -480,6 +506,10 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   }
   if (left && !mid && right) {
     graphics_fill_circle(ctx, GPoint((left_edge + right_edge) / 2, dot_y), dot_r);
+  }
+
+  if (ink) {
+    graphics_fill_rect(ctx, GRect(0, bounds.size.h - 1, bounds.size.w, 1), 0, GCornerNone);
   }
 }
 
@@ -514,9 +544,8 @@ static void draw_comp_weather(GContext *ctx, int cx, int cy, int radius, GColor 
   if (s_weather.loaded) {
     GSize ts = graphics_text_layout_get_content_size(
         temp, s_font_28, temp_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
-    graphics_context_set_stroke_color(ctx, fg);
-    graphics_context_set_stroke_width(ctx, 1);
-    graphics_draw_circle(ctx, GPoint(cx + ts.w / 2 + 3, temp_rect.origin.y + 7), 2);
+    graphics_context_set_fill_color(ctx, fg);
+    graphics_fill_circle(ctx, GPoint(cx + ts.w / 2 + 3, temp_rect.origin.y + 7), 2);
   }
 }
 
@@ -608,14 +637,14 @@ static void draw_bottom_comp(GContext *ctx, uint8_t type, int cx, int cy, int ra
 
   GColor fg, bg;
   if (is_primary) {
-    fg = GColorWhite;
-    bg = s_settings.primary_color;
-    graphics_context_set_fill_color(ctx, s_settings.primary_color);
+    fg = bg_color();
+    bg = fg_color();
+    graphics_context_set_fill_color(ctx, fg_color());
     graphics_fill_circle(ctx, GPoint(cx, cy), radius);
   } else {
-    fg = s_settings.primary_color;
-    bg = GColorWhite;
-    graphics_context_set_stroke_color(ctx, s_settings.primary_color);
+    fg = fg_color();
+    bg = bg_color();
+    graphics_context_set_stroke_color(ctx, fg_color());
     graphics_context_set_stroke_width(ctx, 2);
     graphics_draw_circle(ctx, GPoint(cx, cy), radius);
   }
@@ -714,7 +743,7 @@ static void main_window_load(Window *window) {
   // Time layer (positioned by update_layout)
   s_time_layer = text_layer_create(GRect(0, 0, bounds.size.w, 76));
   text_layer_set_background_color(s_time_layer, GColorClear);
-  text_layer_set_text_color(s_time_layer, s_settings.primary_color);
+  text_layer_set_text_color(s_time_layer, fg_color());
   text_layer_set_font(s_time_layer, s_font_68);
   text_layer_set_text_alignment(s_time_layer, GTextAlignmentCenter);
 
@@ -766,7 +795,7 @@ static void init() {
   load_weather();
   update_mini_weather_buffers();
   s_main_window = window_create();
-  window_set_background_color(s_main_window, GColorWhite);
+  window_set_background_color(s_main_window, bg_color());
   window_set_window_handlers(s_main_window, (WindowHandlers) {
     .load = main_window_load,
     .unload = main_window_unload

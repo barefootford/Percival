@@ -43,8 +43,18 @@ module.exports = [
       {
         "type": "color",
         "messageKey": "PrimaryColor",
-        "label": "Primary Color",
+        "label": "Color",
         "defaultValue": "0x000000"
+      },
+      {
+        "type": "select",
+        "messageKey": "Canvas",
+        "label": "Canvas",
+        "defaultValue": 0,
+        "options": [
+          {"label": "Paper", "value": 0},
+          {"label": "Ink", "value": 1}
+        ]
       },
       {
         "type": "select",

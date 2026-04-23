@@ -10,7 +10,8 @@ https://apps.repebble.com/2799cd581c2a4bbbade7f3da
 ```
 pebble build
 pebble install --emulator emery   # Time 2
-pebble install --phone <IP>
+pebble install --phone <IP>       # direct WebSocket (needs phone IP from Rebble app)
+pebble install --phone            # via CloudPebble proxy — no IP needed, requires Developer Connection enabled in the Rebble app
 ```
 
 Run `pebble clean` when adding or removing messageKeys in package.json — the build uses generated code that becomes stale otherwise.
