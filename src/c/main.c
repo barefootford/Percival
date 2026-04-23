@@ -462,8 +462,7 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   const char *mid = get_mini_comp_text(s_settings.mini_comp_middle);
   const char *right = get_mini_comp_text(s_settings.mini_comp_right);
 
-  GColor content_color = ink ? fg_color() : GColorWhite;
-  graphics_context_set_text_color(ctx, content_color);
+  graphics_context_set_text_color(ctx, GColorWhite);
   int pad = 4;
   GRect text_rect = GRect(pad, 2, bounds.size.w - pad * 2, bounds.size.h);
 
@@ -484,7 +483,7 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   int center_x = bounds.size.w / 2;
   int dot_y = bounds.size.h / 2;
   int dot_r = 2;
-  graphics_context_set_fill_color(ctx, content_color);
+  graphics_context_set_fill_color(ctx, GColorWhite);
 
   GSize left_size = left ? graphics_text_layout_get_content_size(
       left, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft) : GSizeZero;
@@ -639,13 +638,13 @@ static void draw_bottom_comp(GContext *ctx, uint8_t type, int cx, int cy, int ra
   if (is_primary) {
     fg = bg_color();
     bg = fg_color();
-    graphics_context_set_fill_color(ctx, fg_color());
+    graphics_context_set_fill_color(ctx, bg);
     graphics_fill_circle(ctx, GPoint(cx, cy), radius);
   } else {
     fg = fg_color();
     bg = bg_color();
-    graphics_context_set_stroke_color(ctx, fg_color());
-    graphics_context_set_stroke_width(ctx, 2);
+    graphics_context_set_stroke_color(ctx, fg);
+    graphics_context_set_stroke_width(ctx, s_settings.canvas == CANVAS_INK ? 1 : 2);
     graphics_draw_circle(ctx, GPoint(cx, cy), radius);
   }
 
