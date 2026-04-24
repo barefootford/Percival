@@ -3,8 +3,12 @@
 <p align="center">
   <!-- mini: none/year/none · bottom: none/weather/none · color: black · weather: NY 21° · year: 1999 -->
   <img src="screenshots/percival-black.png" width="120" alt="Professional — NY, black">&nbsp;&nbsp;&nbsp;&nbsp;
+  <!-- mini: sunrise/date/sunset · bottom: uv/weather/steps · color: GColorRed · canvas: ink · weather: BOI 82° · sunrise: 6:28 · sunset: 8:12 · uv: 9 · steps: 12k · date: Fri 24 -->
+  <img src="screenshots/percival-crimson.png" width="120" alt="Ink sunrise/sunset — BOI, crimson">&nbsp;&nbsp;&nbsp;&nbsp;
   <!-- mini: date/month/battery · bottom: high-low/weather/sunset · color: GColorPurpureus · weather: DC 58° hi63 lo47 · sunset: 7:42 · date: Sun 5 -->
   <img src="screenshots/percival-purple.png" width="120" alt="Commuter — DC, purple">&nbsp;&nbsp;&nbsp;&nbsp;
+  <!-- mini: battery/month/year · bottom: steps/high-low/week · color: GColorBlack · canvas: ink · weather: hi58 lo44 · steps: 19k · month: May · year: 2026 · week: 15 -->
+  <img src="screenshots/percival-ink.png" width="120" alt="Ink minimal — black & white">&nbsp;&nbsp;&nbsp;&nbsp;
   <!-- mini: date/none/battery · bottom: high-low/steps/weather · color: 0xFF5500 · weather: SF 78° hi82 lo68 · steps: 77k -->
   <img src="screenshots/percival-orange.png" width="120" alt="Runner — SF, orange">&nbsp;&nbsp;&nbsp;&nbsp;
   <!-- mini: date/week/battery · bottom: high-low/week/uv · color: GColorPictonBlue · weather: LA 78° hi82 lo65 · uv: 6 · week: 15 -->
