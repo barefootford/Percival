@@ -55,9 +55,12 @@ static Layer *s_window_layer;
 static GBitmap *s_brand_bitmap;
 static GBitmap *s_sneaker_bitmap;
 static Layer *s_bt_layer;
-static bool s_bt_connected;
+static bool s_bt_app_connected;
+static bool s_bt_radio_connected;
+static Layer *s_qt_layer;
 
 static GFont s_font_14;
+static GFont s_font_16;
 static GFont s_font_18;
 static GFont s_font_28;
 static GFont s_font_68;
@@ -340,9 +343,12 @@ static void update_time(struct tm *tick_time) {
   text_layer_set_text(s_time_layer, display);
 }
 
+static void update_quiet_time();
+
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time(tick_time);
   update_status_buffer(tick_time);
+  update_quiet_time();
 
   // Request weather update every 30 minutes (only if needed and phone is connected)
   if (tick_time->tm_min % WEATHER_POLL_MINUTES == 0 &&
@@ -370,10 +376,8 @@ static void update_status_buffer(struct tm *tick_time) {
 
   if (needs_steps()) {
     int steps = (int)health_service_sum_today(HealthMetricStepCount);
-    if (steps >= 10000) {
+    if (steps >= 1000) {
       snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%dk", steps / 1000);
-    } else if (steps >= 1000) {
-      snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%d.%dk", steps / 1000, (steps % 1000) / 100);
     } else {
       snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%d", steps);
     }
@@ -389,18 +393,40 @@ static void battery_callback(BatteryChargeState state) {
   update_status_buffer(NULL);
 }
 
-static void bt_callback(bool connected) {
-  s_bt_connected = connected;
+static void update_bt_visibility() {
   if (s_bt_layer) {
-    layer_set_hidden(s_bt_layer, connected);
+    layer_set_hidden(s_bt_layer, s_bt_app_connected && s_bt_radio_connected);
   }
+}
+
+static void bt_app_callback(bool connected) {
+  s_bt_app_connected = connected;
+  update_bt_visibility();
+}
+
+static void bt_radio_callback(bool connected) {
+  s_bt_radio_connected = connected;
+  update_bt_visibility();
 }
 
 static void bt_update_proc(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
+  graphics_context_set_text_color(ctx, GColorRed);
+  graphics_draw_text(ctx, "BT", s_font_18, bounds,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
+}
+
+static void qt_update_proc(Layer *layer, GContext *ctx) {
+  GRect bounds = layer_get_bounds(layer);
   graphics_context_set_text_color(ctx, fg_color());
-  graphics_draw_text(ctx, "NO BT", s_font_14, bounds,
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
+  graphics_draw_text(ctx, "QT", s_font_18, bounds,
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+}
+
+static void update_quiet_time() {
+  if (s_qt_layer) {
+    layer_set_hidden(s_qt_layer, !quiet_time_is_active());
+  }
 }
 
 static void update_display() {
@@ -415,6 +441,9 @@ static void update_display() {
   }
   if (s_complications_layer) {
     layer_mark_dirty(s_complications_layer);
+  }
+  if (s_qt_layer) {
+    layer_mark_dirty(s_qt_layer);
   }
 }
 
@@ -458,53 +487,51 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
     graphics_fill_rect(ctx, bounds, 0, GCornerNone);
   }
 
-  const char *left = get_mini_comp_text(s_settings.mini_comp_left);
-  const char *mid = get_mini_comp_text(s_settings.mini_comp_middle);
-  const char *right = get_mini_comp_text(s_settings.mini_comp_right);
+  const char *items_in[3] = {
+    get_mini_comp_text(s_settings.mini_comp_left),
+    get_mini_comp_text(s_settings.mini_comp_middle),
+    get_mini_comp_text(s_settings.mini_comp_right),
+  };
 
   graphics_context_set_text_color(ctx, GColorWhite);
   int pad = 4;
-  GRect text_rect = GRect(pad, 2, bounds.size.w - pad * 2, bounds.size.h);
-
-  if (left) {
-    graphics_draw_text(ctx, left, s_font_14, text_rect,
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-  }
-  if (mid) {
-    graphics_draw_text(ctx, mid, s_font_14, text_rect,
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-  }
-  if (right) {
-    graphics_draw_text(ctx, right, s_font_14, text_rect,
-                       GTextOverflowModeTrailingEllipsis, GTextAlignmentRight, NULL);
-  }
-
-  // Separator dots between adjacent non-empty complications
-  int center_x = bounds.size.w / 2;
-  int dot_y = bounds.size.h / 2;
   int dot_r = 2;
-  graphics_context_set_fill_color(ctx, GColorWhite);
+  int dot_d = 2 * dot_r;
+  int dot_y = bounds.size.h / 2;
+  GRect probe_rect = GRect(0, 0, bounds.size.w, bounds.size.h);
 
-  GSize left_size = left ? graphics_text_layout_get_content_size(
-      left, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft) : GSizeZero;
-  GSize mid_size = mid ? graphics_text_layout_get_content_size(
-      mid, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter) : GSizeZero;
-  GSize right_size = right ? graphics_text_layout_get_content_size(
-      right, s_font_14, text_rect, GTextOverflowModeTrailingEllipsis, GTextAlignmentRight) : GSizeZero;
-
-  int left_edge = pad + left_size.w;
-  int mid_left = center_x - mid_size.w / 2;
-  int mid_right = center_x + mid_size.w / 2;
-  int right_edge = bounds.size.w - pad - right_size.w;
-
-  if (left && mid) {
-    graphics_fill_circle(ctx, GPoint((left_edge + mid_left) / 2, dot_y), dot_r);
+  const char *active[3];
+  GSize sizes[3];
+  int n = 0;
+  int total_text_w = 0;
+  for (int i = 0; i < 3; i++) {
+    if (items_in[i]) {
+      active[n] = items_in[i];
+      sizes[n] = graphics_text_layout_get_content_size(
+          items_in[i], s_font_16, probe_rect,
+          GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft);
+      total_text_w += sizes[n].w;
+      n++;
+    }
   }
-  if (mid && right) {
-    graphics_fill_circle(ctx, GPoint((mid_right + right_edge) / 2, dot_y), dot_r);
-  }
-  if (left && !mid && right) {
-    graphics_fill_circle(ctx, GPoint((left_edge + right_edge) / 2, dot_y), dot_r);
+
+  if (n > 0) {
+    int avail = bounds.size.w - 2 * pad - total_text_w - (n - 1) * dot_d;
+    int gap = (n > 1) ? avail / (2 * (n - 1)) : 0;
+    int x = pad + (n == 1 ? avail / 2 : 0);
+
+    graphics_context_set_fill_color(ctx, GColorWhite);
+    for (int i = 0; i < n; i++) {
+      GRect r = GRect(x, 2, sizes[i].w, bounds.size.h);
+      graphics_draw_text(ctx, active[i], s_font_16, r,
+                         GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
+      x += sizes[i].w;
+      if (i < n - 1) {
+        x += gap;
+        graphics_fill_circle(ctx, GPoint(x + dot_r, dot_y), dot_r);
+        x += dot_d + gap;
+      }
+    }
   }
 
   if (ink) {
@@ -710,7 +737,9 @@ static void update_layout() {
   layer_set_frame(text_layer_get_layer(s_time_layer),
                   GRect(0, group_y, full.size.w, 76));
   layer_set_frame(s_bt_layer,
-                  GRect(full.size.w - 54, TOP_BAR_HEIGHT + 2, 50, 18));
+                  GRect(full.size.w - 54, TOP_BAR_HEIGHT + 2, 50, 22));
+  layer_set_frame(s_qt_layer,
+                  GRect(4, TOP_BAR_HEIGHT + 2, 50, 22));
   layer_set_frame(s_brand_layer,
                   GRect(0, group_y + 76, full.size.w, 20));
 }
@@ -731,6 +760,7 @@ static void main_window_load(Window *window) {
   s_brand_bitmap = gbitmap_create_with_resource(RESOURCE_ID_PEBBLE_LOGO);
   s_sneaker_bitmap = gbitmap_create_with_resource(RESOURCE_ID_SNEAKER_ICON);
   s_font_14 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_14));
+  s_font_16 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_16));
   s_font_18 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_18));
   s_font_28 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_28));
   s_font_68 = fonts_load_custom_font(resource_get_handle(RESOURCE_ID_FONT_INTER_SEMIBOLD_68));
@@ -751,9 +781,14 @@ static void main_window_load(Window *window) {
   layer_set_update_proc(s_brand_layer, brand_update_proc);
 
   // Bluetooth disconnect indicator (positioned by update_layout)
-  s_bt_layer = layer_create(GRect(0, 0, 50, 18));
+  s_bt_layer = layer_create(GRect(0, 0, 50, 22));
   layer_set_update_proc(s_bt_layer, bt_update_proc);
   layer_set_hidden(s_bt_layer, true);
+
+  // Quiet time indicator (positioned by update_layout)
+  s_qt_layer = layer_create(GRect(0, 0, 50, 22));
+  layer_set_update_proc(s_qt_layer, qt_update_proc);
+  layer_set_hidden(s_qt_layer, true);
 
   // Complications layer at the bottom
   int comp_height = 66;
@@ -763,6 +798,7 @@ static void main_window_load(Window *window) {
   layer_add_child(s_window_layer, s_brand_layer);
   layer_add_child(s_window_layer, text_layer_get_layer(s_time_layer));
   layer_add_child(s_window_layer, s_bt_layer);
+  layer_add_child(s_window_layer, s_qt_layer);
   layer_add_child(s_window_layer, s_complications_layer);
   layer_add_child(s_window_layer, s_top_bar_layer);
 
@@ -781,9 +817,11 @@ static void main_window_unload(Window *window) {
   layer_destroy(s_complications_layer);
   layer_destroy(s_top_bar_layer);
   layer_destroy(s_bt_layer);
+  layer_destroy(s_qt_layer);
   gbitmap_destroy(s_brand_bitmap);
   gbitmap_destroy(s_sneaker_bitmap);
   fonts_unload_custom_font(s_font_14);
+  fonts_unload_custom_font(s_font_16);
   fonts_unload_custom_font(s_font_18);
   fonts_unload_custom_font(s_font_28);
   fonts_unload_custom_font(s_font_68);
@@ -809,9 +847,13 @@ static void init() {
   battery_callback(battery_state_service_peek());
 
   connection_service_subscribe((ConnectionHandlers) {
-    .pebble_app_connection_handler = bt_callback
+    .pebble_app_connection_handler = bt_app_callback
   });
-  bt_callback(connection_service_peek_pebble_app_connection());
+  s_bt_app_connected = connection_service_peek_pebble_app_connection();
+  bluetooth_connection_service_subscribe(bt_radio_callback);
+  s_bt_radio_connected = bluetooth_connection_service_peek();
+  update_bt_visibility();
+  update_quiet_time();
 
   app_message_register_inbox_received(inbox_received_callback);
   app_message_register_inbox_dropped(inbox_dropped_callback);
