@@ -55,8 +55,6 @@ static Layer *s_window_layer;
 static GBitmap *s_brand_bitmap;
 static GBitmap *s_sneaker_bitmap;
 static Layer *s_bt_layer;
-static bool s_bt_app_connected;
-static bool s_bt_radio_connected;
 static Layer *s_qt_layer;
 
 static GFont s_font_14;
@@ -343,7 +341,13 @@ static void update_time(struct tm *tick_time) {
   text_layer_set_text(s_time_layer, display);
 }
 
-static void update_quiet_time();
+static void update_quiet_time() {
+  if (!s_qt_layer) return;
+  bool should_hide = !quiet_time_is_active();
+  if (layer_get_hidden(s_qt_layer) != should_hide) {
+    layer_set_hidden(s_qt_layer, should_hide);
+  }
+}
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time(tick_time);
@@ -394,18 +398,15 @@ static void battery_callback(BatteryChargeState state) {
 }
 
 static void update_bt_visibility() {
-  if (s_bt_layer) {
-    layer_set_hidden(s_bt_layer, s_bt_app_connected && s_bt_radio_connected);
+  if (!s_bt_layer) return;
+  bool should_hide = connection_service_peek_pebble_app_connection() &&
+                     bluetooth_connection_service_peek();
+  if (layer_get_hidden(s_bt_layer) != should_hide) {
+    layer_set_hidden(s_bt_layer, should_hide);
   }
 }
 
-static void bt_app_callback(bool connected) {
-  s_bt_app_connected = connected;
-  update_bt_visibility();
-}
-
-static void bt_radio_callback(bool connected) {
-  s_bt_radio_connected = connected;
+static void bt_callback(bool connected) {
   update_bt_visibility();
 }
 
@@ -421,12 +422,6 @@ static void qt_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_text_color(ctx, fg_color());
   graphics_draw_text(ctx, "QT", s_font_18, bounds,
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft, NULL);
-}
-
-static void update_quiet_time() {
-  if (s_qt_layer) {
-    layer_set_hidden(s_qt_layer, !quiet_time_is_active());
-  }
 }
 
 static void update_display() {
@@ -498,7 +493,6 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
   int dot_r = 2;
   int dot_d = 2 * dot_r;
   int dot_y = bounds.size.h / 2;
-  GRect probe_rect = GRect(0, 0, bounds.size.w, bounds.size.h);
 
   const char *active[3];
   GSize sizes[3];
@@ -508,7 +502,7 @@ static void top_bar_update_proc(Layer *layer, GContext *ctx) {
     if (items_in[i]) {
       active[n] = items_in[i];
       sizes[n] = graphics_text_layout_get_content_size(
-          items_in[i], s_font_16, probe_rect,
+          items_in[i], s_font_16, bounds,
           GTextOverflowModeTrailingEllipsis, GTextAlignmentLeft);
       total_text_w += sizes[n].w;
       n++;
@@ -847,11 +841,9 @@ static void init() {
   battery_callback(battery_state_service_peek());
 
   connection_service_subscribe((ConnectionHandlers) {
-    .pebble_app_connection_handler = bt_app_callback
+    .pebble_app_connection_handler = bt_callback
   });
-  s_bt_app_connected = connection_service_peek_pebble_app_connection();
-  bluetooth_connection_service_subscribe(bt_radio_callback);
-  s_bt_radio_connected = bluetooth_connection_service_peek();
+  bluetooth_connection_service_subscribe(bt_callback);
   update_bt_visibility();
   update_quiet_time();
 
